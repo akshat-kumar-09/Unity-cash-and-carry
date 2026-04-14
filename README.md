@@ -8,7 +8,7 @@ A full-featured wholesale e-commerce platform for trade customers, built with Ne
 - 🛍️ **Product Catalog** - Browse products with filtering by category and brand
 - 🛒 **Shopping Cart** - Add products to cart with quantity management
 - 📦 **Order Management** - Create and track orders with full order history
-- 💾 **Database Integration** - SQLite database with Prisma ORM
+- 💾 **Database Integration** - PostgreSQL (e.g. Neon) with Prisma ORM
 - 🎨 **Modern UI** - Built with shadcn/ui components and Tailwind CSS
 - 📱 **Responsive Design** - Mobile-first design optimized for all devices
 
@@ -16,7 +16,7 @@ A full-featured wholesale e-commerce platform for trade customers, built with Ne
 
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
-- **Database**: SQLite (via Prisma)
+- **Database**: PostgreSQL (via Prisma; production uses Neon or similar)
 - **ORM**: Prisma
 - **Authentication**: NextAuth.js v5
 - **UI Components**: shadcn/ui (Radix UI)

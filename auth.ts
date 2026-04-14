@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs"
 import { loginSchema } from "@/lib/validations"
 
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   providers: [
     CredentialsProvider({
       name: "Credentials",
