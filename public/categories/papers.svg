@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" fill="#fef3c7" rx="12"/>
+  <path d="M50 60 L150 60 L150 100 L50 100 Z" fill="#f59e0b" stroke="#d97706" stroke-width="2" rx="4"/>
+  <path d="M55 70 L145 70 L145 95 L55 95 Z" fill="#fbbf24" opacity="0.9"/>
+  <line x1="60" y1="82" x2="140" y2="82" stroke="#b45309" stroke-width="1"/>
+  <text x="100" y="175" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#b45309" text-anchor="middle">PAPERS</text>
+</svg>

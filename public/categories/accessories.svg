@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" fill="#e0e7ff" rx="12"/>
+  <rect x="55" y="50" width="90" height="95" rx="8" fill="#4f46e5" stroke="#4338ca" stroke-width="2"/>
+  <path d="M70 65 L130 65 L130 80 L70 80 Z" fill="#6366f1" rx="2"/>
+  <path d="M70 90 L130 90 L130 105 L70 105 Z" fill="#6366f1" rx="2"/>
+  <path d="M70 115 L110 115 L110 130 L70 130 Z" fill="#6366f1" rx="2"/>
+  <text x="100" y="175" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#3730a3" text-anchor="middle">ACCESSORIES</text>
+</svg>

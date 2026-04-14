@@ -4,7 +4,7 @@ A full-featured wholesale e-commerce platform for trade customers, built with Ne
 
 ## Features
 
-- 🔐 **Authentication & Authorization** - Trade code verification and user authentication
+- 🔐 **Authentication & Authorization** - Email/password sign-in; new users create account after owner approval
 - 🛍️ **Product Catalog** - Browse products with filtering by category and brand
 - 🛒 **Shopping Cart** - Add products to cart with quantity management
 - 📦 **Order Management** - Create and track orders with full order history
@@ -69,16 +69,13 @@ A full-featured wholesale e-commerce platform for trade customers, built with Ne
 6. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-## Default Credentials
+## Sign in & Create account
 
-### Trade Access Codes
-- `TRADE2024` - General trade access
-- `UNITY` - General trade access
-- `ADMIN2024` - Admin trade code
+Access is by **Sign in** (email/password). New approved users use **Create account** on the same screen to set their credentials. No shared access codes.
 
-### Admin Account
-- **Email**: admin@unitycashandcarry.com
-- **Password**: admin123
+### Seeded accounts (after `pnpm db:seed`)
+- **Admin**: admin@unitycashandcarry.com / admin123
+- **Trader**: trader@example.com / trader123
 
 ## Project Structure
 
@@ -109,8 +106,7 @@ A full-featured wholesale e-commerce platform for trade customers, built with Ne
 
 ### Authentication
 - `POST /api/auth/[...nextauth]` - NextAuth.js handler
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/verify-trade-code` - Verify trade access code
+- `POST /api/auth/register` - User registration (create account)
 
 ### Products
 - `GET /api/products` - List products (with query params: category, brand, search)
