@@ -16,7 +16,11 @@ import {
   brandInitials,
   type ProductCategorySlug,
 } from "@/lib/product-categories"
-import { getBrandLogoCandidates } from "@/lib/brand-logos"
+import {
+  brandLogoPrefersDarkTile,
+  brandSlug,
+  getBrandLogoCandidates,
+} from "@/lib/brand-logos"
 
 export type ShopNavigatePayload = {
   categorySlug: ProductCategorySlug
@@ -28,25 +32,42 @@ type ShopCategoryAccordionProps = {
   onNavigate: (payload: ShopNavigatePayload) => void
 }
 
-/** Logo from /public/brands/{slug}.png|webp|svg — falls back to initials */
+/** Fixed slot + object-contain so tall/wide/wordmark assets align in the brand list */
+const LOGO_SHELL =
+  "flex h-11 w-[5rem] shrink-0 items-center justify-center overflow-hidden rounded-xl border shadow-sm sm:w-[5.5rem]"
+
 function BrandMark({ brand }: { brand: BrandFilter }) {
+  const slug = brandSlug(brand)
   const candidates = getBrandLogoCandidates(brand)
   const [idx, setIdx] = useState(0)
+  const darkTile = brandLogoPrefersDarkTile(slug)
+
   if (idx >= candidates.length) {
     return (
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100/90 text-[10px] font-bold text-blue-800 ring-1 ring-blue-200/60">
+      <span
+        className={`${LOGO_SHELL} border-blue-200/90 bg-blue-50 text-[10px] font-bold text-blue-800 ring-1 ring-blue-200/70`}
+      >
         {brandInitials(brand)}
       </span>
     )
   }
+
+  const src = candidates[idx]
+  const tile =
+    darkTile
+      ? "border-neutral-700/90 bg-neutral-950 ring-1 ring-black/25"
+      : "border-slate-200/80 bg-white ring-1 ring-slate-200/70"
+
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={candidates[idx]}
-      alt=""
-      className="h-8 w-8 shrink-0 object-contain"
-      onError={() => setIdx((i) => i + 1)}
-    />
+    <span className={`${LOGO_SHELL} ${tile}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        className={`h-full w-full max-h-[2.75rem] object-contain p-1 ${darkTile ? "brightness-[1.02]" : ""}`}
+        onError={() => setIdx((i) => i + 1)}
+      />
+    </span>
   )
 }
 
