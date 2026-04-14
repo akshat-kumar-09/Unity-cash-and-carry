@@ -91,7 +91,11 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 overflow-y-auto shop-main-tint pb-28">
+      <main
+        className={`flex-1 min-h-0 overflow-y-auto shop-main-tint ${
+          showProductGrid ? "pb-36" : "pb-28"
+        }`}
+      >
         {isAdmin && <AdminBanner onProductAdded={onProductAdded} morphed={false} />}
 
         {!showProductGrid ? (
@@ -104,14 +108,14 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
           />
         ) : (
           <>
-            {/* Stays visible while scrolling product list — phone-first */}
-            <div className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 px-3 py-2.5 backdrop-blur-md shadow-sm supports-[backdrop-filter]:bg-white/90">
+            {/* Fixed above bottom tab bar — always reachable while scrolling products */}
+            <div className="pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-[35] flex justify-center px-3">
               <button
                 type="button"
                 onClick={resetBrowse}
-                className="unity-tap flex w-full items-center gap-2 rounded-xl py-1 text-left text-sm font-semibold text-blue-600 hover:text-blue-700"
+                className="pointer-events-auto unity-tap flex w-full max-w-md items-center justify-center gap-2 rounded-2xl border border-slate-200/90 bg-white/95 py-3 pl-4 pr-4 text-sm font-bold uppercase tracking-wide text-blue-700 shadow-lg shadow-slate-900/10 ring-1 ring-slate-200/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/90"
               >
-                <ChevronLeft className="h-5 w-5 shrink-0" />
+                <ChevronLeft className="h-5 w-5 shrink-0" aria-hidden />
                 Back to categories
               </button>
             </div>
