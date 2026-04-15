@@ -9,6 +9,8 @@ import { EditProductModal } from "./edit-product-modal"
 import type { ProductCategorySlug } from "@/lib/product-categories"
 
 const PAGE_SIZE = 24
+/** When drilling into vape/e-liquid sub-shelves, fetch more rows so client-side subcategory rules aren’t applied to a tiny first page only (max allowed by API is 100). */
+const SUBCATEGORY_FETCH_LIMIT = 100
 
 type ProductCatalogProps = {
   isAdmin?: boolean
@@ -81,7 +83,8 @@ export function ProductCatalog({
     if (activeBrand !== "All") params.append("brand", activeBrand)
     if (search.trim()) params.append("search", search.trim())
     params.set("page", String(pageNum))
-    params.set("limit", String(PAGE_SIZE))
+    const limit = subcategoryFilter != null ? SUBCATEGORY_FETCH_LIMIT : PAGE_SIZE
+    params.set("limit", String(limit))
 
     const response = await fetch(`/api/products?${params.toString()}`)
     const data = await response.json()
@@ -95,7 +98,7 @@ export function ProductCatalog({
       return { total: data.total, totalPages: data.totalPages ?? 1 }
     }
     throw new Error("Invalid response")
-  }, [activeBrand, search, categorySlug])
+  }, [activeBrand, search, categorySlug, subcategoryFilter])
 
   useEffect(() => {
     let cancelled = false
@@ -107,15 +110,26 @@ export function ProductCatalog({
         if (activeBrand !== "All") params.append("brand", activeBrand)
         if (search.trim()) params.append("search", search.trim())
         params.set("page", "1")
-        params.set("limit", String(PAGE_SIZE))
+        const limit = subcategoryFilter != null ? SUBCATEGORY_FETCH_LIMIT : PAGE_SIZE
+        params.set("limit", String(limit))
 
         const response = await fetch(`/api/products?${params.toString()}`)
         const data = await response.json()
         if (cancelled) return
         if (!response.ok) throw new Error("Failed to fetch products")
         if (data?.products && Array.isArray(data.products)) {
+          const totalFromApi = data.total ?? 0
+          const emptyLive = data.products.length === 0 && totalFromApi === 0 && !search.trim()
+          if (emptyLive) {
+            setUsingDemo(true)
+            setProducts([])
+            setTotal(0)
+            setPage(1)
+            setError("Live catalogue is empty — showing sample products. Add stock in Admin when ready.")
+            return
+          }
           setProducts(data.products)
-          setTotal(data.total ?? 0)
+          setTotal(totalFromApi)
           setPage(1)
           setUsingDemo(false)
           setError(null)
@@ -139,7 +153,7 @@ export function ProductCatalog({
     }
     load()
     return () => { cancelled = true }
-  }, [activeBrand, search, refreshKey, categorySlug])
+  }, [activeBrand, search, refreshKey, categorySlug, subcategoryFilter])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
