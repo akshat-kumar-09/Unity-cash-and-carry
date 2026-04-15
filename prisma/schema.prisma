@@ -25,6 +25,8 @@ model User {
 model Product {
   id            String    @id @default(cuid())
   name          String
+  /// UK product information — visible description for trade listings (legal requirement for listings).
+  description   String    @default("")
   brand         String
   category      String
   sku           String    @unique

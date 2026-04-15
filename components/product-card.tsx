@@ -98,6 +98,26 @@ export function ProductCard({
         </span>
       </div>
 
+      {/* UK product information (visible description for trade listings) */}
+      <div className="px-3 pb-2 border-t border-slate-100 pt-2">
+        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1">Product information</p>
+        <p
+          className={`text-[11px] leading-snug ${
+            product.description?.trim()
+              ? "text-slate-700 line-clamp-5"
+              : isAdmin
+                ? "text-amber-800/90"
+                : "text-slate-600"
+          }`}
+        >
+          {product.description?.trim()
+            ? product.description.trim()
+            : isAdmin
+              ? "No description on file — edit this product to add UK-required information (min. 20 characters)."
+              : "See retail packaging for full ingredients, nicotine content, warnings and disposal."}
+        </p>
+      </div>
+
       {/* Pricing — Ex-VAT with green tint, spaced for readability */}
       <div className="mt-auto flex flex-col gap-0.5 border-t border-slate-100 px-3 py-2.5 shop-card-price-tint">
         <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">

@@ -17,6 +17,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
   const [error, setError] = useState("")
   const [form, setForm] = useState({
     name: "",
+    description: "",
     brand: "",
     category: "vapes",
     sku: "",
@@ -28,7 +29,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
     imageUrl: "",
   })
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     if (name === "unitsPerPack" || name === "unitPrice" || name === "casePrice") {
       const num = parseFloat(value) || 0
@@ -41,10 +42,15 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    if (form.description.trim().length < 20) {
+      setError("Product description must be at least 20 characters (UK product information requirement).")
+      return
+    }
     setLoading(true)
     try {
       const payload = {
         ...form,
+        description: form.description.trim(),
         badge: form.badge.trim() || undefined,
         imageUrl: form.imageUrl.trim() || undefined,
       }
@@ -55,7 +61,19 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to add product")
-      setForm({ name: "", brand: "", category: "vapes", sku: "", packLabel: "", unitsPerPack: 10, unitPrice: 0, casePrice: 0, badge: "", imageUrl: "" })
+      setForm({
+        name: "",
+        description: "",
+        brand: "",
+        category: "vapes",
+        sku: "",
+        packLabel: "",
+        unitsPerPack: 10,
+        unitPrice: 0,
+        casePrice: 0,
+        badge: "",
+        imageUrl: "",
+      })
       onSuccess()
       onClose()
     } catch (err) {
@@ -81,6 +99,23 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Name</label>
             <input name="name" value={form.name} onChange={handleChange} required className="w-full px-3 py-2 border border-slate-200 rounded text-sm" placeholder="e.g. 600 Blue Razz" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+              Product description (UK — required)
+            </label>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              required
+              rows={4}
+              className="w-full px-3 py-2 border border-slate-200 rounded text-sm leading-relaxed resize-y min-h-[88px]"
+              placeholder="Ingredients, nicotine strength, warnings, batch/disposal — min. 20 characters."
+            />
+            <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+              Legally required visible product information for UK trade listings. Shown to customers on the product card.
+            </p>
           </div>
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Brand</label>
@@ -111,7 +146,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Units</label>
+              <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Units per box</label>
               <input name="unitsPerPack" type="number" min={1} value={form.unitsPerPack || ""} onChange={handleChange} required className="w-full px-3 py-2 border border-slate-200 rounded text-sm" />
             </div>
             <div>

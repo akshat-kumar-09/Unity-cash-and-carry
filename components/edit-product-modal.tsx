@@ -17,18 +17,22 @@ function roundMoney(n: number): number {
 
 export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditProductModalProps) {
   const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
   const [imageUrl, setImageUrl] = useState("")
   const [casePriceStr, setCasePriceStr] = useState("")
   const [unitPriceStr, setUnitPriceStr] = useState("")
+  const [unitsPerPackStr, setUnitsPerPackStr] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
     if (product) {
       setName(product.name)
+      setDescription(product.description ?? "")
       setImageUrl(product.imageUrl ?? "")
       setCasePriceStr(String(roundMoney(product.casePrice)))
       setUnitPriceStr(String(roundMoney(product.unitPrice)))
+      setUnitsPerPackStr(String(product.unitsPerPack))
       setError("")
     }
   }, [product])
@@ -42,11 +46,24 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
     try {
       const body: {
         name?: string
+        description?: string
         imageUrl?: string | null
         casePrice?: number
         unitPrice?: number
+        unitsPerPack?: number
       } = {}
       if (name.trim() !== product.name) body.name = name.trim()
+
+      const descTrim = description.trim()
+      const prevDesc = (product.description ?? "").trim()
+      if (descTrim !== prevDesc) {
+        if (descTrim.length < 20) {
+          setError("Description must be at least 20 characters (UK product information).")
+          setLoading(false)
+          return
+        }
+        body.description = descTrim
+      }
 
       const trimmed = imageUrl.trim()
       const prev = product.imageUrl ?? ""
@@ -70,6 +87,14 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       const unitRounded = roundMoney(unitP)
       if (caseRounded !== roundMoney(product.casePrice)) body.casePrice = caseRounded
       if (unitRounded !== roundMoney(product.unitPrice)) body.unitPrice = unitRounded
+
+      const upp = parseInt(unitsPerPackStr.replace(/\D/g, ""), 10)
+      if (Number.isNaN(upp) || upp < 1) {
+        setError("Units per box must be a whole number of at least 1.")
+        setLoading(false)
+        return
+      }
+      if (upp !== product.unitsPerPack) body.unitsPerPack = upp
 
       if (Object.keys(body).length === 0) {
         onClose()
@@ -115,6 +140,21 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
             />
           </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+              Product description (UK product information)
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={5}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm leading-relaxed resize-y min-h-[100px]"
+              placeholder="Ingredients, nicotine strength, warnings, disposal — as required for trade listings."
+            />
+            <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+              Minimum 20 characters. Shown to trade customers on the product card.
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
@@ -148,6 +188,23 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
           <p className="text-[10px] text-slate-500 leading-snug">
             Cart totals use case price + VAT. Prices are stored ex. VAT.
           </p>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+              Units per box (case pack)
+            </label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={unitsPerPackStr}
+              onChange={(e) => setUnitsPerPackStr(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+              inputMode="numeric"
+            />
+            <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+              How many sellable units are in one wholesale box/case (same as pack label, e.g. 10).
+            </p>
+          </div>
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Image URL</label>
             <input

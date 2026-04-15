@@ -1,10 +1,14 @@
 import type { Product } from "./products"
 
+/** Demo-only UK-style product information text (real listings use DB `description`). */
+const DEMO_UK_DESCRIPTION =
+  "Trade-only wholesale listing. Nicotine-containing product where applicable — not for sale to persons under 18. See retail packaging for full ingredients, nicotine strength, warnings, batch traceability and responsible person details (UK product information)."
+
 /**
  * Hardcoded demo catalogue (12–24 items) for when API/DB is empty.
  * Admin will manage items later; this ensures the UI never shows "No products found".
  */
-export const demoProducts: Product[] = [
+const rawDemoProducts: Omit<Product, "description">[] = [
   { id: "demo-eb6-blurazz", name: "600 Blue Razz", brand: "Elf Bar", category: "vapes", sku: "EB6-BLRA", packLabel: "Box of 10", unitsPerPack: 10, unitPrice: 3.25, casePrice: 32.5, badge: "Popular" },
   { id: "demo-eb6-watermelon", name: "600 Watermelon", brand: "Elf Bar", category: "vapes", sku: "EB6-WAT", packLabel: "Box of 10", unitsPerPack: 10, unitPrice: 3.25, casePrice: 32.5 },
   { id: "demo-eb6-mango", name: "600 Triple Mango", brand: "Elf Bar", category: "vapes", sku: "EB6-MAN", packLabel: "Box of 10", unitsPerPack: 10, unitPrice: 3.25, casePrice: 32.5 },
@@ -30,3 +34,8 @@ export const demoProducts: Product[] = [
   { id: "demo-eliq-short-higo", name: "Shortfill 100ml Mango", brand: "Higo", category: "e_liquids", sku: "ELIQ-SF-HG-M", packLabel: "Each", unitsPerPack: 1, unitPrice: 14.5, casePrice: 14.5 },
   { id: "demo-eliq-bar-lm", name: "Bar Salt 20mg Cherry", brand: "Lost Mary", category: "e_liquids", sku: "ELIQ-BS-LM-CH", packLabel: "Box of 10", unitsPerPack: 10, unitPrice: 3.1, casePrice: 31.0 },
 ]
+
+export const demoProducts: Product[] = rawDemoProducts.map((p) => ({
+  ...p,
+  description: DEMO_UK_DESCRIPTION,
+}))

@@ -19,6 +19,8 @@ export type Brand =
 export type Product = {
   id: string
   name: string
+  /** UK: product information / description for legal trade listings (may be empty on legacy rows). */
+  description?: string
   brand: string // Changed from Brand to string for API compatibility
   category: string // Changed from Category to string for API compatibility
   sku: string

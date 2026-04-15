@@ -3,6 +3,10 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+/** UK-style visible product text for seeded rows (≥20 chars). */
+const SEED_PRODUCT_DESCRIPTION =
+  'Trade wholesale listing (seed). Nicotine product where applicable — not for sale to persons under 18. See retail packaging for ingredients, nicotine strength, warnings and disposal.'
+
 const VAPE_FLAVOURS = [
   'Blue Razz', 'Blueberry Sour', 'Strawberry Raspberry', 'Watermelon', 'Grape', 'Kiwi Passion',
   'Pink Lemonade', 'Triple Mango', 'Strawberry Ice Cream', 'Cola', 'Cherry', 'Cherry Cola',
@@ -222,7 +226,10 @@ async function main() {
     })
   }
 
-  const toSeed = products.slice(0, 500)
+  const toSeed = products.slice(0, 500).map((p) => ({
+    ...p,
+    description: SEED_PRODUCT_DESCRIPTION,
+  }))
   for (const product of toSeed) {
     await prisma.product.upsert({
       where: { sku: product.sku },
