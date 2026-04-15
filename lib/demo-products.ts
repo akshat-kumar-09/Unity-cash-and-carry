@@ -38,4 +38,5 @@ const rawDemoProducts: Omit<Product, "description">[] = [
 export const demoProducts: Product[] = rawDemoProducts.map((p) => ({
   ...p,
   description: DEMO_UK_DESCRIPTION,
+  maxQtyPerOrder: 100,
 }))

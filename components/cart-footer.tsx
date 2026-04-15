@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Package, Truck, X, Trash2, CheckCircle, Minus, Plus, ArrowLeft } from "lucide-react"
 import { useCart } from "@/lib/cart-context"
 import { useSession } from "next-auth/react"
+import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
 
 type CheckoutFormData = {
   customerPhone: string
@@ -255,7 +256,10 @@ export function CartFooter() {
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-200 bg-white">
-                    {items.map((item) => (
+                    {items.map((item) => {
+                      const lineMax = getEffectiveMaxQtyPerOrder(item.product)
+                      const lineAtMax = item.quantity >= lineMax
+                      return (
                       <div
                         key={item.product.id}
                         className="px-4 py-3 flex items-center gap-3"
@@ -283,10 +287,16 @@ export function CartFooter() {
                           <span className="w-9 text-center font-mono font-bold text-slate-800 text-lg">
                             {item.quantity}
                           </span>
-            <button
-              type="button"
-              onClick={() => addItem(item.product)}
-              className="w-9 h-9 bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 transition-colors rounded"
+                          <button
+                            type="button"
+                            onClick={() => addItem(item.product)}
+                            disabled={lineAtMax}
+                            title={lineAtMax ? `Order limit: ${lineMax} case(s)` : undefined}
+                            className={`w-9 h-9 flex items-center justify-center transition-colors rounded ${
+                              lineAtMax
+                                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                : "bg-blue-600 text-white hover:bg-blue-700"
+                            }`}
                             aria-label={`Add one more ${item.product.name}`}
                           >
                             <Plus className="w-4 h-4" strokeWidth={3} />
@@ -297,7 +307,8 @@ export function CartFooter() {
                           {(item.product.casePrice * item.quantity).toFixed(2)}
                         </p>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>

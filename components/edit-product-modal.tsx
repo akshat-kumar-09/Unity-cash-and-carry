@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { X, Pencil } from "lucide-react"
-import type { Product } from "@/lib/products"
+import { getEffectiveMaxQtyPerOrder, type Product } from "@/lib/products"
 
 type EditProductModalProps = {
   product: Product | null
@@ -22,6 +22,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
   const [casePriceStr, setCasePriceStr] = useState("")
   const [unitPriceStr, setUnitPriceStr] = useState("")
   const [unitsPerPackStr, setUnitsPerPackStr] = useState("")
+  const [maxQtyPerOrderStr, setMaxQtyPerOrderStr] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -33,6 +34,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       setCasePriceStr(String(roundMoney(product.casePrice)))
       setUnitPriceStr(String(roundMoney(product.unitPrice)))
       setUnitsPerPackStr(String(product.unitsPerPack))
+      setMaxQtyPerOrderStr(String(getEffectiveMaxQtyPerOrder(product)))
       setError("")
     }
   }, [product])
@@ -51,6 +53,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
         casePrice?: number
         unitPrice?: number
         unitsPerPack?: number
+        maxQtyPerOrder?: number
       } = {}
       if (name.trim() !== product.name) body.name = name.trim()
 
@@ -95,6 +98,19 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
         return
       }
       if (upp !== product.unitsPerPack) body.unitsPerPack = upp
+
+      const maxQ = parseInt(maxQtyPerOrderStr.replace(/\D/g, ""), 10)
+      if (Number.isNaN(maxQ) || maxQ < 1) {
+        setError("Order limit must be a whole number of at least 1.")
+        setLoading(false)
+        return
+      }
+      if (maxQ > 99999) {
+        setError("Order limit cannot exceed 99999.")
+        setLoading(false)
+        return
+      }
+      if (maxQ !== getEffectiveMaxQtyPerOrder(product)) body.maxQtyPerOrder = maxQ
 
       if (Object.keys(body).length === 0) {
         onClose()
@@ -203,6 +219,24 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
             />
             <p className="mt-1 text-[10px] text-slate-500 leading-snug">
               How many sellable units are in one wholesale box/case (same as pack label, e.g. 10).
+            </p>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+              Order limit
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={99999}
+              step={1}
+              value={maxQtyPerOrderStr}
+              onChange={(e) => setMaxQtyPerOrderStr(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+              inputMode="numeric"
+            />
+            <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+              Max wholesale cases one customer can buy per order (cart and checkout enforce this).
             </p>
           </div>
           <div>

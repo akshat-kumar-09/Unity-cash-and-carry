@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
-import type { Product } from "./products"
+import { getEffectiveMaxQtyPerOrder, type Product } from "./products"
 
 export type CartItem = {
   product: Product
@@ -79,11 +79,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addItem = useCallback((product: Product) => {
     setItems((prev) => {
+      const maxQ = getEffectiveMaxQtyPerOrder(product)
       const existing = prev.find((i) => i.product.id === product.id)
+      if (existing && existing.quantity >= maxQ) return prev
       const updated = existing
         ? prev.map((i) =>
             i.product.id === product.id
-              ? { ...i, quantity: i.quantity + 1 }
+              ? { ...i, quantity: Math.min(i.quantity + 1, maxQ) }
               : i
           )
         : [...prev, { product, quantity: 1 }]

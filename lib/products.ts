@@ -28,6 +28,8 @@ export type Product = {
   unitsPerPack: number
   unitPrice: number
   casePrice: number
+  /** Max cases per order for this product (enforced in cart + checkout). */
+  maxQtyPerOrder?: number
   badge?: string | null
   isActive?: boolean
   /** Product image URL. Use getProductImageUrl() for placeholder when missing. */
@@ -68,6 +70,13 @@ export type BrandFilter = (typeof brandFilters)[number]
 
 // Which real brands fall under "Accessories"
 const accessoryBrands: string[] = ["Rizla", "RAW", "Swan", "Clipper"]
+/** Caps for cart / checkout (cases per line). Defaults if missing on legacy rows. */
+export function getEffectiveMaxQtyPerOrder(product: { maxQtyPerOrder?: number | null }): number {
+  const n = product.maxQtyPerOrder
+  if (n == null || Number.isNaN(Number(n))) return 100
+  return Math.max(1, Math.min(99999, Math.floor(Number(n))))
+}
+
 export function matchesBrandFilter(product: Product, filter: BrandFilter): boolean {
   if (filter === "All") return true
   if (filter === "Accessories") return accessoryBrands.includes(product.brand)

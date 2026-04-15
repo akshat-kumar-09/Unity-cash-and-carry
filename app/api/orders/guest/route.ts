@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createGuestOrderSchema } from "@/lib/validations"
+import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
 import bcrypt from "bcryptjs"
 
 const VALID_TRADE_CODES = ["TRUSTANDUNITY", "BESTINGLASGOW"]
@@ -33,6 +34,19 @@ export async function POST(request: NextRequest) {
         { error: "Some products are invalid or inactive" },
         { status: 400 }
       )
+    }
+
+    for (const item of items) {
+      const product = products.find((p) => p.id === item.productId)!
+      const lineMax = getEffectiveMaxQtyPerOrder(
+        product as { maxQtyPerOrder?: number | null }
+      )
+      if (item.quantity > lineMax) {
+        return NextResponse.json(
+          { error: `Order limit for ${product.name}: ${lineMax} case(s)` },
+          { status: 400 }
+        )
+      }
     }
 
     let subtotal = 0

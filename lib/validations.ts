@@ -19,6 +19,7 @@ const productFields = {
   unitsPerPack: z.number().int().positive(),
   unitPrice: z.number().positive(),
   casePrice: z.number().positive(),
+  maxQtyPerOrder: z.number().int().min(1).max(99999).default(100),
   badge: z.string().optional(),
   imageUrl: z.string().max(2000).optional().nullable(),
 }
@@ -82,6 +83,8 @@ export const updateProductSchema = z
     casePrice: z.number().positive().optional(),
     /** Units per box/case (wholesale pack size). */
     unitsPerPack: z.number().int().positive().optional(),
+    /** Max cases per customer order for this line. */
+    maxQtyPerOrder: z.number().int().min(1).max(99999).optional(),
   })
   .refine(
     (d) =>
@@ -90,6 +93,7 @@ export const updateProductSchema = z
       d.imageUrl !== undefined ||
       d.unitPrice !== undefined ||
       d.casePrice !== undefined ||
-      d.unitsPerPack !== undefined,
+      d.unitsPerPack !== undefined ||
+      d.maxQtyPerOrder !== undefined,
     { message: "At least one field required" }
   )

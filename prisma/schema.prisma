@@ -34,6 +34,8 @@ model Product {
   unitsPerPack  Int
   unitPrice     Float
   casePrice     Float
+  /// Max cases of this SKU a customer can order per line (wholesale cap).
+  maxQtyPerOrder Int      @default(100)
   badge         String?
   imageUrl      String?
   isActive      Boolean   @default(true)

@@ -4,7 +4,7 @@ import React from "react"
 
 import { Minus, Plus, Pencil, ShoppingCart, Trash2 } from "lucide-react"
 import type { Product } from "@/lib/products"
-import { getProductImageUrl } from "@/lib/products"
+import { getEffectiveMaxQtyPerOrder, getProductImageUrl } from "@/lib/products"
 import { useCart } from "@/lib/cart-context"
 
 export function ProductCard({
@@ -22,6 +22,8 @@ export function ProductCard({
 }) {
   const { addItem, removeItem, getQuantity } = useCart()
   const quantity = getQuantity(product.id)
+  const maxPerOrder = getEffectiveMaxQtyPerOrder(product)
+  const atMaxQty = quantity >= maxPerOrder
   const imageUrl = getProductImageUrl(product)
 
   const animateIn = index < 24
@@ -131,6 +133,9 @@ export function ProductCard({
           {"£"}
           {product.unitPrice.toFixed(2)}/unit
         </p>
+        <p className="text-[9px] font-mono text-slate-500 pt-0.5">
+          Order limit: {maxPerOrder} case{maxPerOrder === 1 ? "" : "s"}
+        </p>
       </div>
 
       {/* Quick Add -- large tap targets */}
@@ -160,7 +165,13 @@ export function ProductCard({
             <button
               type="button"
               onClick={() => addItem(product)}
-              className="flex-1 py-3.5 bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center justify-center"
+              disabled={atMaxQty}
+              title={atMaxQty ? `Order limit: ${maxPerOrder} case(s)` : undefined}
+              className={`flex-1 py-3.5 flex items-center justify-center transition-colors ${
+                atMaxQty
+                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
               aria-label={`Add one more ${product.name}`}
             >
               <Plus className="w-5 h-5" strokeWidth={3} />

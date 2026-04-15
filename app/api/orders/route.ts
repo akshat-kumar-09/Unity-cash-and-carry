@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createOrderSchema } from "@/lib/validations"
 import { auth } from "@/auth"
+import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,6 +72,19 @@ export async function POST(request: NextRequest) {
         { error: "Some products are invalid or inactive" },
         { status: 400 }
       )
+    }
+
+    for (const item of parsed.data.items) {
+      const product = products.find((p) => p.id === item.productId)!
+      const lineMax = getEffectiveMaxQtyPerOrder(
+        product as { maxQtyPerOrder?: number | null }
+      )
+      if (item.quantity > lineMax) {
+        return NextResponse.json(
+          { error: `Order limit for ${product.name}: ${lineMax} case(s)` },
+          { status: 400 }
+        )
+      }
     }
 
     // Calculate totals

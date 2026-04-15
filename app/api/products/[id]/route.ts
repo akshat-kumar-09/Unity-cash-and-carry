@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
-    const { name, description, imageUrl, unitPrice, casePrice, unitsPerPack } = parsed.data
+    const { name, description, imageUrl, unitPrice, casePrice, unitsPerPack, maxQtyPerOrder } = parsed.data
     const data: {
       name?: string
       description?: string
@@ -32,6 +32,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       unitPrice?: number
       casePrice?: number
       unitsPerPack?: number
+      maxQtyPerOrder?: number
     } = {}
     if (name !== undefined) data.name = name
     if (description !== undefined) data.description = description.trim()
@@ -41,6 +42,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (unitPrice !== undefined) data.unitPrice = unitPrice
     if (casePrice !== undefined) data.casePrice = casePrice
     if (unitsPerPack !== undefined) data.unitsPerPack = unitsPerPack
+    if (maxQtyPerOrder !== undefined) data.maxQtyPerOrder = maxQtyPerOrder
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 })

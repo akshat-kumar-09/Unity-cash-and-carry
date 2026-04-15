@@ -25,13 +25,14 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
     unitsPerPack: 10,
     unitPrice: 0,
     casePrice: 0,
+    maxQtyPerOrder: 100,
     badge: "",
     imageUrl: "",
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    if (name === "unitsPerPack" || name === "unitPrice" || name === "casePrice") {
+    if (name === "unitsPerPack" || name === "unitPrice" || name === "casePrice" || name === "maxQtyPerOrder") {
       const num = parseFloat(value) || 0
       setForm((p) => ({ ...p, [name]: num }))
     } else {
@@ -71,6 +72,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
         unitsPerPack: 10,
         unitPrice: 0,
         casePrice: 0,
+        maxQtyPerOrder: 100,
         badge: "",
         imageUrl: "",
       })
@@ -144,10 +146,14 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Pack Label</label>
             <input name="packLabel" value={form.packLabel} onChange={handleChange} required className="w-full px-3 py-2 border border-slate-200 rounded text-sm" placeholder="e.g. Box of 10" />
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div>
               <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Units per box</label>
               <input name="unitsPerPack" type="number" min={1} value={form.unitsPerPack || ""} onChange={handleChange} required className="w-full px-3 py-2 border border-slate-200 rounded text-sm" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Order limit</label>
+              <input name="maxQtyPerOrder" type="number" min={1} max={99999} value={form.maxQtyPerOrder || ""} onChange={handleChange} required className="w-full px-3 py-2 border border-slate-200 rounded text-sm" />
             </div>
             <div>
               <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Unit £</label>
@@ -158,6 +164,9 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
               <input name="casePrice" type="number" step="0.01" min={0} value={form.casePrice || ""} onChange={handleChange} required className="w-full px-3 py-2 border border-slate-200 rounded text-sm" />
             </div>
           </div>
+          <p className="text-[10px] text-slate-500 leading-snug -mt-1">
+            Max wholesale cases one customer can buy per order (enforced in cart and checkout).
+          </p>
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Image URL (optional)</label>
             <input name="imageUrl" value={form.imageUrl} onChange={handleChange} className="w-full px-3 py-2 border border-slate-200 rounded text-sm font-mono text-[13px]" placeholder="https://… or /brands/elf-bar.png" />

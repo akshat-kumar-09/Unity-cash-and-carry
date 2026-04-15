@@ -229,6 +229,7 @@ async function main() {
   const toSeed = products.slice(0, 500).map((p) => ({
     ...p,
     description: SEED_PRODUCT_DESCRIPTION,
+    maxQtyPerOrder: 100,
   }))
   for (const product of toSeed) {
     await prisma.product.upsert({
