@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { X, Plus } from "lucide-react"
 import { categories } from "@/lib/products"
 
@@ -85,18 +86,52 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
     }
   }
 
+  useEffect(() => {
+    if (!isOpen) return
+    const body = document.body
+    const html = document.documentElement
+    const prevBody = body.style.overflow
+    const prevHtml = html.style.overflow
+    body.style.overflow = "hidden"
+    html.style.overflow = "hidden"
+    return () => {
+      body.style.overflow = prevBody
+      html.style.overflow = prevHtml
+    }
+  }, [isOpen])
+
   if (!isOpen) return null
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">Add Product</h2>
-          <button type="button" onClick={onClose} className="p-1 text-slate-500 hover:text-slate-700" aria-label="Close">
-            <X className="w-5 h-5" />
+  const modal = (
+    <div
+      className="fixed inset-0 z-[100] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-product-title"
+        className="flex h-[100dvh] w-full max-w-md flex-col border border-slate-200 bg-white shadow-xl sm:h-auto sm:max-h-[min(90dvh,900px)] sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2 id="add-product-title" className="text-sm font-bold uppercase tracking-wider text-slate-800">
+            Add Product
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 touch-pan-y">
           {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Name</label>
@@ -175,12 +210,21 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Badge (optional)</label>
             <input name="badge" value={form.badge} onChange={handleChange} className="w-full px-3 py-2 border border-slate-200 rounded text-sm" placeholder="e.g. Popular, New" />
           </div>
-          <div className="flex gap-2 pt-2">
-            <button type="submit" disabled={loading} className="flex-1 py-2.5 bg-blue-600 text-white text-[11px] font-bold uppercase tracking-wider rounded hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-1.5">
-              <Plus className="w-4 h-4" />
+          </div>
+          <div className="flex shrink-0 gap-2 border-t border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              <Plus className="h-4 w-4" />
               {loading ? "Adding…" : "Add Product"}
             </button>
-            <button type="button" onClick={onClose} className="px-4 py-2.5 border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-wider rounded hover:bg-slate-50">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-slate-200 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+            >
               Cancel
             </button>
           </div>
@@ -188,4 +232,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
       </div>
     </div>
   )
+
+  if (typeof document === "undefined") return null
+  return createPortal(modal, document.body)
 }

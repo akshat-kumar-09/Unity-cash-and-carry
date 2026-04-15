@@ -83,6 +83,8 @@ export const updateProductSchema = z
     casePrice: z.number().positive().optional(),
     /** Units per box/case (wholesale pack size). */
     unitsPerPack: z.number().int().positive().optional(),
+    /** Customer-facing pack line on cards (e.g. Box of 10, Outer of 5). */
+    packLabel: z.string().min(1).max(120).optional(),
     /** Max cases per customer order for this line. */
     maxQtyPerOrder: z.number().int().min(1).max(99999).optional(),
   })
@@ -94,6 +96,27 @@ export const updateProductSchema = z
       d.unitPrice !== undefined ||
       d.casePrice !== undefined ||
       d.unitsPerPack !== undefined ||
+      d.packLabel !== undefined ||
       d.maxQtyPerOrder !== undefined,
     { message: "At least one field required" }
+  )
+
+/** Admin: same fields applied to many products (catalog bulk edit). */
+export const bulkUpdateProductsSchema = z
+  .object({
+    productIds: z.array(z.string().min(1)).min(1).max(300),
+    casePrice: z.number().positive().optional(),
+    unitPrice: z.number().positive().optional(),
+    unitsPerPack: z.number().int().positive().optional(),
+    packLabel: z.string().min(1).max(120).optional(),
+    maxQtyPerOrder: z.number().int().min(1).max(99999).optional(),
+  })
+  .refine(
+    (d) =>
+      d.casePrice !== undefined ||
+      d.unitPrice !== undefined ||
+      d.unitsPerPack !== undefined ||
+      d.packLabel !== undefined ||
+      d.maxQtyPerOrder !== undefined,
+    { message: "At least one field to update is required" }
   )

@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
-    const { name, description, imageUrl, unitPrice, casePrice, unitsPerPack, maxQtyPerOrder } = parsed.data
+    const { name, description, imageUrl, unitPrice, casePrice, unitsPerPack, packLabel, maxQtyPerOrder } = parsed.data
     const data: {
       name?: string
       description?: string
@@ -32,6 +32,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       unitPrice?: number
       casePrice?: number
       unitsPerPack?: number
+      packLabel?: string
       maxQtyPerOrder?: number
     } = {}
     if (name !== undefined) data.name = name
@@ -42,6 +43,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (unitPrice !== undefined) data.unitPrice = unitPrice
     if (casePrice !== undefined) data.casePrice = casePrice
     if (unitsPerPack !== undefined) data.unitsPerPack = unitsPerPack
+    if (packLabel !== undefined) data.packLabel = packLabel.trim()
     if (maxQtyPerOrder !== undefined) data.maxQtyPerOrder = maxQtyPerOrder
 
     if (Object.keys(data).length === 0) {

@@ -6,7 +6,12 @@ import { demoProducts } from "@/lib/demo-products"
 import { ProductCard } from "./product-card"
 import { BrandHeader } from "./brand-header"
 import { EditProductModal } from "./edit-product-modal"
+import { BulkEditProductsModal } from "./bulk-edit-products-modal"
 import type { ProductCategorySlug } from "@/lib/product-categories"
+
+function isLiveCatalogProduct(p: Product) {
+  return !String(p.id).startsWith("demo-")
+}
 
 const PAGE_SIZE = 24
 /** When drilling into vape/e-liquid sub-shelves, fetch more rows so client-side subcategory rules aren’t applied to a tiny first page only (max allowed by API is 100). */
@@ -76,6 +81,8 @@ export function ProductCatalog({
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usingDemo, setUsingDemo] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkModalOpen, setBulkModalOpen] = useState(false)
 
   const fetchPage = useCallback(async (pageNum: number, append: boolean) => {
     const params = new URLSearchParams()
@@ -180,6 +187,16 @@ export function ProductCatalog({
     return [...list].sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name))
   }, [products, usingDemo, activeBrand, search, subcategoryFilter, categorySlug, isAdmin])
 
+  useEffect(() => {
+    setSelectedIds([])
+  }, [categorySlug, activeBrand, search, subcategoryFilter, usingDemo])
+
+  const toggleSelectProduct = useCallback((id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }, [])
+
+  const clearSelection = useCallback(() => setSelectedIds([]), [])
+
   const useClientFilter = usingDemo || subcategoryFilter != null
   const demoTotal = filtered.length
   const demoPageSize = PAGE_SIZE
@@ -187,6 +204,13 @@ export function ProductCatalog({
   const demoHasMore = useClientFilter ? page * demoPageSize < demoTotal : false
   const totalCount = useClientFilter ? demoTotal : total
   const hasMore = useClientFilter ? demoHasMore : products.length < total
+
+  const selectAllVisibleLive = useCallback(() => {
+    const ids = demoDisplayed
+      .filter((p) => isAdmin && !usingDemo && isLiveCatalogProduct(p))
+      .map((p) => p.id)
+    setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])))
+  }, [demoDisplayed, isAdmin, usingDemo])
 
   const handleLoadMore = async () => {
     if (useClientFilter) {
@@ -233,16 +257,37 @@ export function ProductCatalog({
           setEditingProduct(null)
         }}
       />
+      <BulkEditProductsModal
+        isOpen={bulkModalOpen}
+        selectedIds={selectedIds}
+        onClose={() => setBulkModalOpen(false)}
+        onSuccess={() => {
+          setSelectedIds([])
+          setBulkModalOpen(false)
+          onProductUpdated?.()
+        }}
+      />
       {/* Results bar */}
-      <div className="flex items-center justify-between rounded-2xl border border-slate-200/90 bg-white px-3 py-2.5 shadow-sm shop-section-tint">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-          {loading
-            ? "Loading..."
-            : totalCount === 0
-              ? "0 products"
-              : `${demoDisplayed.length} of ${totalCount} ${totalCount === 1 ? "product" : "products"}`
-          }
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/90 bg-white px-3 py-2.5 shadow-sm shop-section-tint">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+            {loading
+              ? "Loading..."
+              : totalCount === 0
+                ? "0 products"
+                : `${demoDisplayed.length} of ${totalCount} ${totalCount === 1 ? "product" : "products"}`
+            }
+          </p>
+          {isAdmin && !usingDemo && !loading && totalCount > 0 && (
+            <button
+              type="button"
+              onClick={selectAllVisibleLive}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+            >
+              Select visible
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 ring-1 ring-amber-200/60">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden />
           <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-900/80">
@@ -282,28 +327,54 @@ export function ProductCatalog({
       {/* Product grid */}
       {!loading && !error && (
         <>
+          {isAdmin && !usingDemo && selectedIds.length > 0 && (
+            <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-2 right-2 z-[45] flex max-w-md flex-wrap items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2.5 text-sm shadow-lg shadow-slate-900/10 backdrop-blur-md sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+              <span className="font-bold text-slate-800">
+                {selectedIds.length} selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setBulkModalOpen(true)}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-blue-700"
+              >
+                Bulk edit
+              </button>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+              >
+                Clear
+              </button>
+            </div>
+          )}
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 pb-4">
-            {demoDisplayed.map((product, i) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                index={i}
-                isAdmin={isAdmin}
-                onAdminEdit={
-                  isAdmin && !usingDemo && !String(product.id).startsWith("demo-")
-                    ? () => setEditingProduct(product)
-                    : undefined
-                }
-                onAdminDelete={
-                  isAdmin && !usingDemo && !String(product.id).startsWith("demo-")
-                    ? () => {
-                        if (deletingId) return
-                        void handleAdminDelete(product)
-                      }
-                    : undefined
-                }
-              />
-            ))}
+            {demoDisplayed.map((product, i) => {
+              const live = isLiveCatalogProduct(product)
+              return (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  index={i}
+                  isAdmin={isAdmin}
+                  bulkSelected={selectedIds.includes(product.id)}
+                  onBulkToggle={
+                    isAdmin && !usingDemo && live ? () => toggleSelectProduct(product.id) : undefined
+                  }
+                  onAdminEdit={
+                    isAdmin && !usingDemo && live ? () => setEditingProduct(product) : undefined
+                  }
+                  onAdminDelete={
+                    isAdmin && !usingDemo && live
+                      ? () => {
+                          if (deletingId) return
+                          void handleAdminDelete(product)
+                        }
+                      : undefined
+                  }
+                />
+              )
+            })}
           </div>
           {hasMore && (
             <div className="flex justify-center pb-8">

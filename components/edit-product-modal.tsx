@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { X, Pencil } from "lucide-react"
 import { getEffectiveMaxQtyPerOrder, type Product } from "@/lib/products"
 
@@ -22,6 +23,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
   const [casePriceStr, setCasePriceStr] = useState("")
   const [unitPriceStr, setUnitPriceStr] = useState("")
   const [unitsPerPackStr, setUnitsPerPackStr] = useState("")
+  const [packLabel, setPackLabel] = useState("")
   const [maxQtyPerOrderStr, setMaxQtyPerOrderStr] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -34,15 +36,29 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       setCasePriceStr(String(roundMoney(product.casePrice)))
       setUnitPriceStr(String(roundMoney(product.unitPrice)))
       setUnitsPerPackStr(String(product.unitsPerPack))
+      setPackLabel(product.packLabel ?? "")
       setMaxQtyPerOrderStr(String(getEffectiveMaxQtyPerOrder(product)))
       setError("")
     }
   }, [product])
 
-  if (!isOpen || !product) return null
+  useEffect(() => {
+    if (!isOpen || !product) return
+    const body = document.body
+    const html = document.documentElement
+    const prevBody = body.style.overflow
+    const prevHtml = html.style.overflow
+    body.style.overflow = "hidden"
+    html.style.overflow = "hidden"
+    return () => {
+      body.style.overflow = prevBody
+      html.style.overflow = prevHtml
+    }
+  }, [isOpen, product])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!product) return
     setError("")
     setLoading(true)
     try {
@@ -53,6 +69,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
         casePrice?: number
         unitPrice?: number
         unitsPerPack?: number
+        packLabel?: string
         maxQtyPerOrder?: number
       } = {}
       if (name.trim() !== product.name) body.name = name.trim()
@@ -99,6 +116,14 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       }
       if (upp !== product.unitsPerPack) body.unitsPerPack = upp
 
+      const packTrim = packLabel.trim()
+      if (packTrim.length < 1) {
+        setError("Pack label is required (e.g. Box of 5).")
+        setLoading(false)
+        return
+      }
+      if (packTrim !== product.packLabel) body.packLabel = packTrim
+
       const maxQ = parseInt(maxQtyPerOrderStr.replace(/\D/g, ""), 10)
       if (Number.isNaN(maxQ) || maxQ < 1) {
         setError("Order limit must be a whole number of at least 1.")
@@ -132,19 +157,42 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-200">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-            <Pencil className="w-4 h-4 text-blue-600" />
+  if (!isOpen || !product) return null
+
+  const modal = (
+    <div
+      className="fixed inset-0 z-[100] flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-product-title"
+        className="flex h-[100dvh] w-full max-w-md flex-col border border-slate-200 bg-white shadow-xl sm:h-auto sm:max-h-[min(90dvh,900px)] sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h2
+            id="edit-product-title"
+            className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-800"
+          >
+            <Pencil className="h-4 w-4 text-blue-600" />
             Edit product
           </h2>
-          <button type="button" onClick={onClose} className="p-1 text-slate-500 hover:text-slate-700" aria-label="Close">
-            <X className="w-5 h-5" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-3">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 touch-pan-y">
           <p className="text-[11px] text-slate-500 font-mono truncate">SKU: {product.sku}</p>
           {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
           <div>
@@ -218,7 +266,23 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
               inputMode="numeric"
             />
             <p className="mt-1 text-[10px] text-slate-500 leading-snug">
-              How many sellable units are in one wholesale box/case (same as pack label, e.g. 10).
+              How many sellable units are in one wholesale box/case.
+            </p>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+              Pack label
+            </label>
+            <input
+              value={packLabel}
+              onChange={(e) => setPackLabel(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              placeholder="e.g. Box of 5, Outer of 10"
+              autoComplete="off"
+            />
+            <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+              Shown on product cards under the name — match units per box (e.g. Box of 5 when the case holds 5).
             </p>
           </div>
           <div>
@@ -251,18 +315,19 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
               Leave empty to use category placeholder. Clear field to remove custom image.
             </p>
           </div>
-          <div className="flex gap-2 pt-2">
+          </div>
+          <div className="flex shrink-0 gap-2 border-t border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2.5 bg-blue-600 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg hover:bg-blue-700 disabled:opacity-60"
+              className="flex-1 rounded-lg bg-blue-600 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white hover:bg-blue-700 disabled:opacity-60"
             >
               {loading ? "Saving…" : "Save"}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 border border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-wider rounded-lg hover:bg-slate-50"
+              className="rounded-lg border border-slate-200 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50"
             >
               Cancel
             </button>
@@ -271,4 +336,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       </div>
     </div>
   )
+
+  if (typeof document === "undefined") return null
+  return createPortal(modal, document.body)
 }

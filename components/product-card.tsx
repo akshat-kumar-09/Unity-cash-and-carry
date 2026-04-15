@@ -13,12 +13,17 @@ export function ProductCard({
   isAdmin = false,
   onAdminEdit,
   onAdminDelete,
+  bulkSelected = false,
+  onBulkToggle,
 }: {
   product: Product
   index?: number
   isAdmin?: boolean
   onAdminEdit?: () => void
   onAdminDelete?: () => void
+  /** When set, shows a checkbox for catalog bulk edit (admin + live stock). */
+  bulkSelected?: boolean
+  onBulkToggle?: () => void
 }) {
   const { addItem, removeItem, getQuantity } = useCart()
   const quantity = getQuantity(product.id)
@@ -31,14 +36,31 @@ export function ProductCard({
   return (
     <div
       className={`unity-card flex flex-col overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-        quantity > 0
-          ? "border-2 border-blue-400/60 shadow-md shadow-blue-500/10 ring-1 ring-blue-100"
-          : "border-slate-200/90 hover:border-blue-200"
+        bulkSelected
+          ? "border-2 border-blue-500 shadow-md ring-2 ring-blue-400/50"
+          : quantity > 0
+            ? "border-2 border-blue-400/60 shadow-md shadow-blue-500/10 ring-1 ring-blue-100"
+            : "border-slate-200/90 hover:border-blue-200"
       } ${animateIn ? "opacity-0 animate-slide-up-fade [animation-fill-mode:forwards]" : ""}`}
       style={animateIn ? { animationDelay: `${Math.min(index * 35, 350)}ms` } : undefined}
     >
       {/* Product image — img tag so placeholders load; fallback to local if external fails */}
       <div className="relative aspect-square w-full bg-gradient-to-b from-slate-50 to-slate-100/80">
+        {onBulkToggle && (
+          <label className="absolute left-1.5 top-1.5 z-20 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg bg-white/95 shadow-md ring-1 ring-slate-200/80">
+            <input
+              type="checkbox"
+              checked={bulkSelected}
+              onChange={(e) => {
+                e.stopPropagation()
+                onBulkToggle()
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              aria-label={`Select ${product.name} for bulk edit`}
+            />
+          </label>
+        )}
         {isAdmin && (onAdminEdit || onAdminDelete) && (
           <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
             {onAdminDelete && (
