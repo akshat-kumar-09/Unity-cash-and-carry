@@ -24,12 +24,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
-    const { name, imageUrl } = parsed.data
-    const data: { name?: string; imageUrl?: string | null } = {}
+    const { name, imageUrl, unitPrice, casePrice } = parsed.data
+    const data: {
+      name?: string
+      imageUrl?: string | null
+      unitPrice?: number
+      casePrice?: number
+    } = {}
     if (name !== undefined) data.name = name
     if (imageUrl !== undefined) {
       data.imageUrl = imageUrl === "" || imageUrl === null ? null : imageUrl.trim()
     }
+    if (unitPrice !== undefined) data.unitPrice = unitPrice
+    if (casePrice !== undefined) data.casePrice = casePrice
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 })

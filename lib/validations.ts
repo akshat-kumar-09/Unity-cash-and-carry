@@ -63,12 +63,19 @@ export const registerSchema = z.object({
   tradeCode: z.string().optional(),
 })
 
-/** Admin partial update — name and/or product image URL (absolute URL or path like /brands/x.png; empty clears) */
+/** Admin partial update — name, image, and/or wholesale prices (ex. VAT) */
 export const updateProductSchema = z
   .object({
     name: z.string().min(1).max(200).optional(),
     imageUrl: z.string().max(2000).optional().nullable(),
+    unitPrice: z.number().positive().optional(),
+    casePrice: z.number().positive().optional(),
   })
-  .refine((d) => d.name !== undefined || d.imageUrl !== undefined, {
-    message: "At least one field required",
-  })
+  .refine(
+    (d) =>
+      d.name !== undefined ||
+      d.imageUrl !== undefined ||
+      d.unitPrice !== undefined ||
+      d.casePrice !== undefined,
+    { message: "At least one field required" }
+  )

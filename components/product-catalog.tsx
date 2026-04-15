@@ -148,7 +148,7 @@ export function ProductCatalog({
       list = demoProducts.filter((p) => {
         if (p.category !== categorySlug) return false
         if (!matchesBrandFilter(p, activeBrand)) return false
-        if (subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
+        if (!isAdmin && subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
         if (q && !p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q)) return false
         return true
       })
@@ -156,13 +156,15 @@ export function ProductCatalog({
       list = products.filter((p) => {
         if (p.category !== categorySlug) return false
         if (!matchesBrandFilter(p, activeBrand)) return false
-        if (subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
+        // Subcategory rules use heuristics on name/SKU; renaming can drop "600" etc. and hide the product.
+        // Admins need to see every product the API returned for this category/brand so edits don't "vanish".
+        if (!isAdmin && subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
         if (q && !p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !(p.sku ?? "").toLowerCase().includes(q)) return false
         return true
       })
     }
     return [...list].sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name))
-  }, [products, usingDemo, activeBrand, search, subcategoryFilter, categorySlug])
+  }, [products, usingDemo, activeBrand, search, subcategoryFilter, categorySlug, isAdmin])
 
   const useClientFilter = usingDemo || subcategoryFilter != null
   const demoTotal = filtered.length

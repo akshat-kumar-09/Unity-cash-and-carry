@@ -11,9 +11,15 @@ type EditProductModalProps = {
   onSuccess: () => void
 }
 
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
 export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditProductModalProps) {
   const [name, setName] = useState("")
   const [imageUrl, setImageUrl] = useState("")
+  const [casePriceStr, setCasePriceStr] = useState("")
+  const [unitPriceStr, setUnitPriceStr] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -21,6 +27,8 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
     if (product) {
       setName(product.name)
       setImageUrl(product.imageUrl ?? "")
+      setCasePriceStr(String(roundMoney(product.casePrice)))
+      setUnitPriceStr(String(roundMoney(product.unitPrice)))
       setError("")
     }
   }, [product])
@@ -32,13 +40,37 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
     setError("")
     setLoading(true)
     try {
-      const body: { name?: string; imageUrl?: string | null } = {}
+      const body: {
+        name?: string
+        imageUrl?: string | null
+        casePrice?: number
+        unitPrice?: number
+      } = {}
       if (name.trim() !== product.name) body.name = name.trim()
+
       const trimmed = imageUrl.trim()
       const prev = product.imageUrl ?? ""
       if (trimmed !== prev) {
         body.imageUrl = trimmed === "" ? null : trimmed
       }
+
+      const caseP = parseFloat(casePriceStr.replace(",", "."))
+      const unitP = parseFloat(unitPriceStr.replace(",", "."))
+      if (Number.isNaN(caseP) || caseP <= 0) {
+        setError("Case price must be a positive number.")
+        setLoading(false)
+        return
+      }
+      if (Number.isNaN(unitP) || unitP <= 0) {
+        setError("Unit price must be a positive number.")
+        setLoading(false)
+        return
+      }
+      const caseRounded = roundMoney(caseP)
+      const unitRounded = roundMoney(unitP)
+      if (caseRounded !== roundMoney(product.casePrice)) body.casePrice = caseRounded
+      if (unitRounded !== roundMoney(product.unitPrice)) body.unitPrice = unitRounded
+
       if (Object.keys(body).length === 0) {
         onClose()
         return
@@ -83,6 +115,39 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
             />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                Case price (£ ex VAT)
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={casePriceStr}
+                onChange={(e) => setCasePriceStr(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                placeholder="0.00"
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                Unit price (£ ex VAT)
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={unitPriceStr}
+                onChange={(e) => setUnitPriceStr(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                placeholder="0.00"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-500 leading-snug">
+            Cart totals use case price + VAT. Prices are stored ex. VAT.
+          </p>
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Image URL</label>
             <input
