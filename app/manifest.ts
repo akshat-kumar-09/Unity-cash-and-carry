@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Unity Cash & Carry",
-    short_name: "Unity Trade",
+    name: "Unity",
+    short_name: "Unity",
     description:
       "Trade wholesale ordering for approved Unity Cash & Carry customers — fast UK dispatch.",
     start_url: "/",

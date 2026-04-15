@@ -3,30 +3,30 @@
 import { Suspense, useState, useEffect } from "react"
 import { signIn, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Shield, Mail, Lock, User } from "lucide-react"
+import { Shield, Mail, Lock, ExternalLink } from "lucide-react"
 import { UnityLogo } from "@/components/unity-logo"
 
-type Mode = "signin" | "register"
+const MARKETING_REGISTER_URL =
+  typeof process.env.NEXT_PUBLIC_MARKETING_REGISTER_URL === "string"
+    ? process.env.NEXT_PUBLIC_MARKETING_REGISTER_URL.trim()
+    : ""
 
 function LoginPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session, status } = useSession()
+  const { status } = useSession()
   const callbackUrl = searchParams.get("callbackUrl") || "/"
 
-  const [mode, setMode] = useState<Mode>("signin")
-  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (status === "authenticated") {
       router.replace(callbackUrl)
     }
-  }, [status, session, router, callbackUrl])
+  }, [status, router, callbackUrl])
 
   if (status === "loading") {
     return (
@@ -42,7 +42,6 @@ function LoginPageContent() {
     e.preventDefault()
     setLoading(true)
     setError("")
-    setSuccess("")
     try {
       const result = await signIn("credentials", {
         email: email.trim().toLowerCase(),
@@ -65,45 +64,14 @@ function LoginPageContent() {
     }
   }
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
-    setSuccess("")
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          password,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || "Registration failed. Please try again.")
-        setLoading(false)
-        return
-      }
-      setSuccess("Account created. Sign in below.")
-      setMode("signin")
-      setPassword("")
-    } catch (err) {
-      console.error("Register error:", err)
-      setError("Something went wrong. Please try again.")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSubmit = mode === "signin" ? handleSignIn : handleRegister
-
   return (
     <div className="min-h-screen min-h-[100dvh] auth-page-bg flex flex-col items-center justify-center px-5 py-8 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
         <div className="absolute top-1/4 -left-24 w-80 h-80 rounded-full bg-cyan-400/25 blur-[80px] animate-float" />
-        <div className="absolute bottom-1/3 -right-24 w-96 h-96 rounded-full bg-blue-400/30 blur-[100px] animate-float" style={{ animationDelay: "1.5s" }} />
+        <div
+          className="absolute bottom-1/3 -right-24 w-96 h-96 rounded-full bg-blue-400/30 blur-[100px] animate-float"
+          style={{ animationDelay: "1.5s" }}
+        />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full bg-white/5 blur-2xl" />
       </div>
 
@@ -134,37 +102,15 @@ function LoginPageContent() {
           <div className="flex items-center gap-3 mb-5 pb-4 border-b border-slate-200">
             <Shield className="w-5 h-5 text-blue-600" />
             <span className="text-sm font-bold uppercase tracking-wider text-slate-800">
-              {mode === "signin" ? "Sign In" : "Create account"}
+              Sign In
             </span>
           </div>
 
           <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-            {mode === "signin"
-              ? "Sign in with your trade account to view wholesale prices and place orders."
-              : "Set your credentials. You’ll only see this after the owner has approved you and shared the app link."}
+            Sign in with the credentials we sent after your application was approved.
           </p>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {mode === "register" && (
-              <div>
-                <label htmlFor="name" className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                  Name
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name or business"
-                    className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-800 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    required
-                    autoComplete="name"
-                  />
-                </div>
-              </div>
-            )}
+          <form onSubmit={handleSignIn} className="flex flex-col gap-4">
             <div>
               <label htmlFor="email" className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
                 Email
@@ -194,11 +140,10 @@ function LoginPageContent() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === "register" ? "Min 6 characters" : "••••••••"}
+                  placeholder="••••••••"
                   className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-slate-800 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                   required
-                  minLength={mode === "register" ? 6 : undefined}
-                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  autoComplete="current-password"
                 />
               </div>
             </div>
@@ -208,55 +153,42 @@ function LoginPageContent() {
                 {error}
               </p>
             )}
-            {success && (
-              <p className="text-green-700 text-sm font-medium bg-green-50 px-3 py-2 rounded-lg border border-green-100">
-                {success}
-              </p>
-            )}
 
             <button
               type="submit"
               disabled={loading}
               className="w-full py-3.5 bg-blue-600 text-white font-bold text-sm uppercase tracking-wider rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-blue-600/25"
             >
-              {loading
-                ? mode === "signin"
-                  ? "Signing in..."
-                  : "Creating account..."
-                : mode === "signin"
-                  ? "Sign In"
-                  : "Create account"}
+              {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
-          <p className="text-center text-slate-500 text-xs mt-4">
-            {mode === "signin" ? (
-              <>
-                No account yet?{" "}
-                <button
-                  type="button"
-                  onClick={() => { setMode("register"); setError(""); setSuccess(""); }}
-                  className="font-semibold text-blue-600 hover:underline"
-                >
-                  Create account
-                </button>
-              </>
+          <div className="mt-5 pt-4 border-t border-slate-200">
+            <p className="text-xs text-slate-500 text-center mb-3">
+              Don&apos;t have access yet? Apply on our website first — we&apos;ll email your login details when approved.
+            </p>
+            {MARKETING_REGISTER_URL ? (
+              <a
+                href={MARKETING_REGISTER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50/80 py-3 text-sm font-bold uppercase tracking-wider text-blue-800 transition hover:bg-blue-100"
+              >
+                Apply for access
+                <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+              </a>
             ) : (
-              <>
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => { setMode("signin"); setError(""); setSuccess(""); }}
-                  className="font-semibold text-blue-600 hover:underline"
-                >
-                  Sign in
-                </button>
-              </>
+              <p className="text-center text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Set <code className="font-mono text-[11px]">NEXT_PUBLIC_MARKETING_REGISTER_URL</code> in Vercel to link to your application form.
+              </p>
             )}
-          </p>
+          </div>
         </div>
 
-        <p className="text-center text-white/50 text-xs mt-6 opacity-0 animate-scale-in [animation-fill-mode:forwards]" style={{ animationDelay: "400ms" }}>
+        <p
+          className="text-center text-white/50 text-xs mt-6 opacity-0 animate-scale-in [animation-fill-mode:forwards]"
+          style={{ animationDelay: "400ms" }}
+        >
           All prices excl. VAT • Glasgow
         </p>
       </div>

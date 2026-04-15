@@ -67,6 +67,7 @@ export function ProductCatalog({
 }: ProductCatalogProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -186,6 +187,25 @@ export function ProductCatalog({
     }
   }
 
+  const handleAdminDelete = async (product: Product) => {
+    if (!isAdmin || usingDemo || String(product.id).startsWith("demo-")) return
+    if (!confirm(`Remove “${product.name}” from the catalog?`)) return
+    setDeletingId(product.id)
+    try {
+      const res = await fetch(`/api/products/${product.id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || "Could not remove product.")
+        return
+      }
+      setProducts((prev) => prev.filter((p) => p.id !== product.id))
+      setTotal((t) => Math.max(0, t - 1))
+      onProductUpdated?.()
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="flex-1 pb-40">
       <EditProductModal
@@ -256,6 +276,14 @@ export function ProductCatalog({
                 onAdminEdit={
                   isAdmin && !usingDemo && !String(product.id).startsWith("demo-")
                     ? () => setEditingProduct(product)
+                    : undefined
+                }
+                onAdminDelete={
+                  isAdmin && !usingDemo && !String(product.id).startsWith("demo-")
+                    ? () => {
+                        if (deletingId) return
+                        void handleAdminDelete(product)
+                      }
                     : undefined
                 }
               />

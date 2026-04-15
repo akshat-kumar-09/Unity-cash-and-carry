@@ -46,3 +46,26 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 })
   }
 }
+
+/** Soft-delete: hide product from catalog (preserves order history). */
+export async function DELETE(_request: NextRequest, context: RouteContext) {
+  try {
+    const session = await auth()
+    const isAdmin = session && (session.user as { role?: string })?.role === "admin"
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { id } = await context.params
+
+    const product = await prisma.product.update({
+      where: { id },
+      data: { isActive: false },
+    })
+
+    return NextResponse.json({ ok: true, id: product.id })
+  } catch (error) {
+    console.error("DELETE product:", error)
+    return NextResponse.json({ error: "Failed to remove product" }, { status: 500 })
+  }
+}

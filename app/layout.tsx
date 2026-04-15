@@ -18,10 +18,11 @@ export const metadata: Metadata = {
   title: 'Unity Cash & Carry | Trade Wholesale',
   description:
     'Specialist tobacco & vape wholesale platform for approved trade customers. Fast UK tracked postage, dispatch under 24hrs.',
-  applicationName: 'Unity Cash & Carry',
+  /** Single word so “Add to Home Screen” / PWA shortcut name is not mangled (spaces stripped on some platforms). */
+  applicationName: 'Unity',
   appleWebApp: {
     capable: true,
-    title: 'Unity Cash & Carry',
+    title: 'Unity',
     statusBarStyle: 'default',
   },
   formatDetection: {

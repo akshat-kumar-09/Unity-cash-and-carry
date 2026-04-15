@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { Minus, Plus, Pencil, ShoppingCart } from "lucide-react"
+import { Minus, Plus, Pencil, ShoppingCart, Trash2 } from "lucide-react"
 import type { Product } from "@/lib/products"
 import { getProductImageUrl } from "@/lib/products"
 import { useCart } from "@/lib/cart-context"
@@ -12,11 +12,13 @@ export function ProductCard({
   index = 0,
   isAdmin = false,
   onAdminEdit,
+  onAdminDelete,
 }: {
   product: Product
   index?: number
   isAdmin?: boolean
   onAdminEdit?: () => void
+  onAdminDelete?: () => void
 }) {
   const { addItem, removeItem, getQuantity } = useCart()
   const quantity = getQuantity(product.id)
@@ -35,18 +37,35 @@ export function ProductCard({
     >
       {/* Product image — img tag so placeholders load; fallback to local if external fails */}
       <div className="relative aspect-square w-full bg-gradient-to-b from-slate-50 to-slate-100/80">
-        {isAdmin && onAdminEdit && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onAdminEdit()
-            }}
-            className="absolute right-1.5 top-1.5 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-white/95 text-blue-600 shadow-md ring-1 ring-slate-200/80 transition hover:bg-blue-50"
-            aria-label="Edit product"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
+        {isAdmin && (onAdminEdit || onAdminDelete) && (
+          <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
+            {onAdminDelete && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAdminDelete()
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/95 text-red-600 shadow-md ring-1 ring-slate-200/80 transition hover:bg-red-50"
+                aria-label="Remove product from catalog"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+            {onAdminEdit && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onAdminEdit()
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/95 text-blue-600 shadow-md ring-1 ring-slate-200/80 transition hover:bg-blue-50"
+                aria-label="Edit product"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
