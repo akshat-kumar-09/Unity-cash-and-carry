@@ -81,7 +81,7 @@ async function main() {
   const trader = await prisma.user.upsert({
     where: { email: 'trader@example.com' },
     update: {
-      walletBalance: 120.00,
+      walletBalance: 45.00,
     },
     create: {
       email: 'trader@example.com',
@@ -89,7 +89,7 @@ async function main() {
       password: traderPassword,
       role: 'trader',
       tradeCode: 'TRUSTANDUNITY',
-      walletBalance: 120.00,
+      walletBalance: 45.00,
     },
   })
   console.log('Created trader user')
@@ -101,7 +101,7 @@ async function main() {
     await prisma.walletTransaction.create({
       data: {
         userId: trader.id,
-        amount: 120.00,
+        amount: 45.00,
         type: 'promo_reward',
         description: 'First sign-up trade voucher reward'
       }

@@ -17,7 +17,7 @@ model User {
   password      String
   tradeCode     String?   @unique
   role          String    @default("customer") // admin, trader, customer
-  walletBalance Float     @default(0.00)
+  walletBalance Float     @default(45.00)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   orders        Order[]
