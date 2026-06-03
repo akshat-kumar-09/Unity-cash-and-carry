@@ -36,7 +36,7 @@ type DashboardStats = {
   ordersToday: number
   ordersThisMonth: number
   revenueThisMonth: number
-  dutyLiability: number
+  dutyThisMonth: number
   activeTraders: number
   pendingCompliance: number
   revenueTrend?: number
@@ -78,7 +78,7 @@ export function AdminDashboardView({ activeSection, onSectionChange, children }:
           ordersToday: 23,
           ordersThisMonth: 347,
           revenueThisMonth: 84250.0,
-          dutyLiability: 12680.5,
+          dutyThisMonth: 12680.5,
           activeTraders: 89,
           pendingCompliance: 7,
           revenueTrend: 12.4,
@@ -117,7 +117,7 @@ export function AdminDashboardView({ activeSection, onSectionChange, children }:
         },
         {
           label: "VPD Duty Liability",
-          value: `£${stats.dutyLiability.toLocaleString("en-GB", { minimumFractionDigits: 2 })}`,
+          value: `£${stats.dutyThisMonth.toLocaleString("en-GB", { minimumFractionDigits: 2 })}`,
           icon: Landmark,
           color: "bg-amber-50 text-amber-600",
           iconBg: "bg-amber-100",
