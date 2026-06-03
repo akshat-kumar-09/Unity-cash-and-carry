@@ -22,6 +22,9 @@ const productFields = {
   maxQtyPerOrder: z.number().int().min(1).max(99999).default(100),
   badge: z.string().optional(),
   imageUrl: z.string().max(2000).optional().nullable(),
+  liquidVolumeMl: z.number().nonnegative().default(2.0),
+  isSubjectToVapeDuty: z.boolean().default(true),
+  nicotineStrengthMg: z.number().nonnegative().default(20.0),
 }
 
 export const productSchema = z.preprocess((data) => {
@@ -89,6 +92,9 @@ export const updateProductSchema = z
     packLabel: z.string().min(1).max(120).optional(),
     /** Max cases per customer order for this line. */
     maxQtyPerOrder: z.number().int().min(1).max(99999).optional(),
+    liquidVolumeMl: z.number().nonnegative().optional(),
+    isSubjectToVapeDuty: z.boolean().optional(),
+    nicotineStrengthMg: z.number().nonnegative().optional(),
   })
   .refine(
     (d) =>
@@ -99,7 +105,10 @@ export const updateProductSchema = z
       d.casePrice !== undefined ||
       d.unitsPerPack !== undefined ||
       d.packLabel !== undefined ||
-      d.maxQtyPerOrder !== undefined,
+      d.maxQtyPerOrder !== undefined ||
+      d.liquidVolumeMl !== undefined ||
+      d.isSubjectToVapeDuty !== undefined ||
+      d.nicotineStrengthMg !== undefined,
     { message: "At least one field required" }
   )
 
@@ -117,6 +126,9 @@ export const bulkUpdateProductsSchema = z
     unitsPerPack: z.number().int().positive().optional(),
     packLabel: z.string().min(1).max(120).optional(),
     maxQtyPerOrder: z.number().int().min(1).max(99999).optional(),
+    liquidVolumeMl: z.number().nonnegative().optional(),
+    isSubjectToVapeDuty: z.boolean().optional(),
+    nicotineStrengthMg: z.number().nonnegative().optional(),
   })
   .refine(
     (d) =>
@@ -125,6 +137,9 @@ export const bulkUpdateProductsSchema = z
       d.unitPrice !== undefined ||
       d.unitsPerPack !== undefined ||
       d.packLabel !== undefined ||
-      d.maxQtyPerOrder !== undefined,
+      d.maxQtyPerOrder !== undefined ||
+      d.liquidVolumeMl !== undefined ||
+      d.isSubjectToVapeDuty !== undefined ||
+      d.nicotineStrengthMg !== undefined,
     { message: "At least one field to update is required" }
   )

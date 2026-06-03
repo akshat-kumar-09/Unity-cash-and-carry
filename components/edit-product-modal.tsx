@@ -27,6 +27,9 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
   const [maxQtyPerOrderStr, setMaxQtyPerOrderStr] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [liquidVolumeMl, setLiquidVolumeMl] = useState(2.0)
+  const [isSubjectToVapeDuty, setIsSubjectToVapeDuty] = useState(true)
+  const [nicotineStrengthMg, setNicotineStrengthMg] = useState(20.0)
 
   useEffect(() => {
     if (product) {
@@ -38,6 +41,9 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       setUnitsPerPackStr(String(product.unitsPerPack))
       setPackLabel(product.packLabel ?? "")
       setMaxQtyPerOrderStr(String(getEffectiveMaxQtyPerOrder(product)))
+      setLiquidVolumeMl(product.liquidVolumeMl ?? 2.0)
+      setIsSubjectToVapeDuty(product.isSubjectToVapeDuty ?? true)
+      setNicotineStrengthMg(product.nicotineStrengthMg ?? 20.0)
       setError("")
     }
   }, [product])
@@ -71,6 +77,9 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
         unitsPerPack?: number
         packLabel?: string
         maxQtyPerOrder?: number
+        liquidVolumeMl?: number
+        isSubjectToVapeDuty?: boolean
+        nicotineStrengthMg?: number
       } = {}
       if (name.trim() !== product.name) body.name = name.trim()
 
@@ -136,6 +145,9 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
         return
       }
       if (maxQ !== getEffectiveMaxQtyPerOrder(product)) body.maxQtyPerOrder = maxQ
+      if (liquidVolumeMl !== (product.liquidVolumeMl ?? 2.0)) body.liquidVolumeMl = liquidVolumeMl
+      if (isSubjectToVapeDuty !== (product.isSubjectToVapeDuty ?? true)) body.isSubjectToVapeDuty = isSubjectToVapeDuty
+      if (nicotineStrengthMg !== (product.nicotineStrengthMg ?? 20.0)) body.nicotineStrengthMg = nicotineStrengthMg
 
       if (Object.keys(body).length === 0) {
         onClose()
@@ -302,6 +314,61 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
             <p className="mt-1 text-[10px] text-slate-500 leading-snug">
               Max wholesale cases one customer can buy per order (cart and checkout enforce this).
             </p>
+          </div>
+
+          {/* Excise & TPD Compliance */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-3.5 text-left">
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              Excise & TPD Compliance
+            </h4>
+            
+            <div className="flex items-center justify-between bg-white border border-slate-150 rounded-xl px-3 py-2.5">
+              <div className="text-left">
+                <p className="text-xs font-bold text-slate-800">Subject to Vape Duty</p>
+                <p className="text-[9px] font-semibold text-slate-400">Excise duty at £2.20 per 10ml liquid</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={isSubjectToVapeDuty}
+                onChange={(e) => setIsSubjectToVapeDuty(e.target.checked)}
+                className="h-4.5 w-4.5 rounded border-slate-350 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+            </div>
+
+            {isSubjectToVapeDuty && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                    E-Liquid Volume (ml)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={liquidVolumeMl}
+                    onChange={(e) => setLiquidVolumeMl(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                    required
+                  />
+                  <p className="mt-0.5 text-[8.5px] text-slate-400">Volume per unit (e.g. 2.0 or 10.0)</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                    Nicotine Strength (mg)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={nicotineStrengthMg}
+                    onChange={(e) => setNicotineStrengthMg(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                    required
+                  />
+                  <p className="mt-0.5 text-[8.5px] text-slate-400">Standard max limit is 20.0mg/ml</p>
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Image URL</label>

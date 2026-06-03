@@ -158,11 +158,41 @@ export function ProductCard({
         </h3>
       </div>
 
-      {/* Pack label */}
-      <div className="px-3 pb-2">
-        <span className="inline-block px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wider rounded">
-          {product.packLabel}
-        </span>
+      {/* Compliance & Specifications Info */}
+      <div className="px-3 pb-2.5 flex flex-col gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-block px-1.5 py-0.5 bg-slate-100 text-slate-650 text-[9px] font-bold uppercase tracking-wider rounded border border-slate-200">
+            {product.packLabel}
+          </span>
+          {product.isSubjectToVapeDuty ? (
+            <>
+              <span className="inline-block px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold uppercase tracking-wider rounded">
+                Duty Stamped [VDS]
+              </span>
+              {product.liquidVolumeMl != null && product.liquidVolumeMl > 0 && (
+                <span className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-150 text-[9px] font-bold uppercase tracking-wider rounded font-mono">
+                  {product.liquidVolumeMl}ml
+                </span>
+              )}
+              {product.nicotineStrengthMg != null && (
+                <span className="inline-block px-1.5 py-0.5 bg-cyan-50 text-cyan-700 border border-cyan-150 text-[9px] font-bold uppercase tracking-wider rounded font-mono">
+                  {product.nicotineStrengthMg > 0 ? `${product.nicotineStrengthMg}mg` : "Nic-Free"}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="inline-block px-1.5 py-0.5 bg-slate-200/50 text-slate-500 border border-slate-350/50 text-[9px] font-bold uppercase tracking-wider rounded">
+              Excise Exempt
+            </span>
+          )}
+        </div>
+
+        {product.isSubjectToVapeDuty && product.liquidVolumeMl != null && product.liquidVolumeMl > 0 && (
+          <div className="text-[10px] text-emerald-800 font-bold bg-emerald-50/60 rounded-xl p-2 border border-emerald-150/50 flex items-center justify-between font-mono mt-0.5">
+            <span>Wholesale Vape Duty:</span>
+            <span>+£{(product.unitsPerPack * product.liquidVolumeMl * 0.22).toFixed(2)}</span>
+          </div>
+        )}
       </div>
 
       {/* UK product information (visible description for trade listings) */}

@@ -108,7 +108,20 @@ async function main() {
     })
   }
 
-  const products: { name: string; brand: string; category: string; sku: string; packLabel: string; unitsPerPack: number; unitPrice: number; casePrice: number; badge?: string }[] = []
+  const products: {
+    name: string
+    brand: string
+    category: string
+    sku: string
+    packLabel: string
+    unitsPerPack: number
+    unitPrice: number
+    casePrice: number
+    badge?: string
+    isSubjectToVapeDuty: boolean
+    liquidVolumeMl: number
+    nicotineStrengthMg: number
+  }[] = []
   const usedSkus = new Set<string>()
 
   function addVape(brand: string, line: string, flavour: string, skuPrefix: string, packLabel: string, units: number, unitPrice: number, badge?: string) {
@@ -120,6 +133,12 @@ async function main() {
       sku = `${skuPrefix}-${slug}${n}`.toUpperCase()
     }
     usedSkus.add(sku)
+
+    let liquidVolumeMl = 2.0
+    if (line.includes("2400")) liquidVolumeMl = 8.0
+    else if (line.includes("4000") || line.includes("Max")) liquidVolumeMl = 10.0
+    else if (line.includes("30K")) liquidVolumeMl = 30.0
+
     products.push({
       name: `${line} ${flavour}`,
       brand,
@@ -130,6 +149,9 @@ async function main() {
       unitPrice,
       casePrice: Math.round(unitPrice * units * 100) / 100,
       badge,
+      isSubjectToVapeDuty: true,
+      liquidVolumeMl,
+      nicotineStrengthMg: 20.0,
     })
   }
 
@@ -169,6 +191,9 @@ async function main() {
         unitPrice: p.unitPrice,
         casePrice: Math.round(p.unitPrice * p.units * 100) / 100,
         badge: i === 0 ? p.badge : undefined,
+        isSubjectToVapeDuty: false,
+        liquidVolumeMl: 0.0,
+        nicotineStrengthMg: 0.0,
       })
     })
   }
@@ -192,6 +217,9 @@ async function main() {
       unitPrice,
       casePrice: Math.round(unitPrice * units * 100) / 100,
       badge: i === 0 ? undefined : undefined,
+      isSubjectToVapeDuty: false,
+      liquidVolumeMl: 0.0,
+      nicotineStrengthMg: 0.0,
     })
   }
 
@@ -212,6 +240,9 @@ async function main() {
       unitsPerPack: 1,
       unitPrice,
       casePrice: unitPrice,
+      isSubjectToVapeDuty: false,
+      liquidVolumeMl: 0.0,
+      nicotineStrengthMg: 0.0,
     })
   }
 
@@ -237,6 +268,9 @@ async function main() {
       unitsPerPack: 1,
       unitPrice: acc.unitPrice,
       casePrice: acc.unitPrice,
+      isSubjectToVapeDuty: false,
+      liquidVolumeMl: 0.0,
+      nicotineStrengthMg: 0.0,
     })
   }
 
@@ -248,6 +282,12 @@ async function main() {
     const sku = `${v.skuPrefix}-${slug}`.toUpperCase().slice(0, 12)
     if (usedSkus.has(sku)) continue
     usedSkus.add(sku)
+
+    let liquidVolumeMl = 2.0
+    if (v.line.includes("2400")) liquidVolumeMl = 8.0
+    else if (v.line.includes("4000") || v.line.includes("Max")) liquidVolumeMl = 10.0
+    else if (v.line.includes("30K")) liquidVolumeMl = 30.0
+
     products.push({
       name: `${v.line} ${f}`,
       brand: v.brand,
@@ -257,6 +297,9 @@ async function main() {
       unitsPerPack: v.units,
       unitPrice: v.unitPrice,
       casePrice: Math.round(v.unitPrice * v.units * 100) / 100,
+      isSubjectToVapeDuty: true,
+      liquidVolumeMl,
+      nicotineStrengthMg: 20.0,
     })
   }
 

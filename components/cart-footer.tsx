@@ -93,11 +93,20 @@ export function CartFooter() {
   const vapeDutyAmount = items.reduce((acc, item) => {
     if (item.product.isSubjectToVapeDuty) {
       const vol = item.product.liquidVolumeMl ?? 2.0
-      return acc + item.quantity * vol * 0.22
+      return acc + item.quantity * item.product.unitsPerPack * vol * 0.22
     }
     return acc
   }, 0)
   const roundedVapeDuty = Math.round(vapeDutyAmount * 100) / 100
+
+  // Calculate total e-liquid volume (ml)
+  const totalLiquidVolumeMl = items.reduce((acc, item) => {
+    if (item.product.isSubjectToVapeDuty) {
+      const vol = item.product.liquidVolumeMl ?? 2.0
+      return acc + item.quantity * item.product.unitsPerPack * vol
+    }
+    return acc
+  }, 0)
 
   const updatedVat = Math.round((updatedSubtotal + roundedVapeDuty) * 0.2 * 100) / 100
   const preWalletTotal = Math.round((updatedSubtotal + roundedVapeDuty + updatedVat) * 100) / 100
@@ -476,14 +485,26 @@ export function CartFooter() {
                     )}
 
                     {roundedVapeDuty > 0 && (
-                      <div className="flex items-center justify-between text-amber-700">
-                        <span className="text-xs uppercase font-mono font-bold">
-                          Vaping Products Duty
-                        </span>
-                        <span className="text-sm font-mono font-bold">
-                          +£{roundedVapeDuty.toFixed(2)}
-                        </span>
-                      </div>
+                      <>
+                        {totalLiquidVolumeMl > 0 && (
+                          <div className="flex items-center justify-between text-slate-500">
+                            <span className="text-xs uppercase font-mono font-semibold">
+                              Total E-Liquid Volume
+                            </span>
+                            <span className="text-sm font-mono font-semibold">
+                              {totalLiquidVolumeMl.toLocaleString()} ml
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between text-amber-700">
+                          <span className="text-xs uppercase font-mono font-bold">
+                            Vaping Products Duty
+                          </span>
+                          <span className="text-sm font-mono font-bold">
+                            +£{roundedVapeDuty.toFixed(2)}
+                          </span>
+                        </div>
+                      </>
                     )}
 
                     <div className="flex items-center justify-between">

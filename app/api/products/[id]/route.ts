@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
-    const { name, description, imageUrl, unitPrice, casePrice, unitsPerPack, packLabel, maxQtyPerOrder } = parsed.data
+    const { name, description, imageUrl, unitPrice, casePrice, unitsPerPack, packLabel, maxQtyPerOrder, liquidVolumeMl, isSubjectToVapeDuty, nicotineStrengthMg } = parsed.data
     const data: {
       name?: string
       description?: string
@@ -34,6 +34,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       unitsPerPack?: number
       packLabel?: string
       maxQtyPerOrder?: number
+      liquidVolumeMl?: number
+      isSubjectToVapeDuty?: boolean
+      nicotineStrengthMg?: number
     } = {}
     if (name !== undefined) data.name = name
     if (description !== undefined) data.description = description.trim()
@@ -45,6 +48,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (unitsPerPack !== undefined) data.unitsPerPack = unitsPerPack
     if (packLabel !== undefined) data.packLabel = packLabel.trim()
     if (maxQtyPerOrder !== undefined) data.maxQtyPerOrder = maxQtyPerOrder
+    if (liquidVolumeMl !== undefined) data.liquidVolumeMl = liquidVolumeMl
+    if (isSubjectToVapeDuty !== undefined) data.isSubjectToVapeDuty = isSubjectToVapeDuty
+    if (nicotineStrengthMg !== undefined) data.nicotineStrengthMg = nicotineStrengthMg
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 })

@@ -29,11 +29,17 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
     maxQtyPerOrder: 100,
     badge: "",
     imageUrl: "",
+    isSubjectToVapeDuty: true,
+    liquidVolumeMl: 2.0,
+    nicotineStrengthMg: 20.0,
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    if (name === "unitsPerPack" || name === "unitPrice" || name === "casePrice" || name === "maxQtyPerOrder") {
+    const { name, value, type } = e.target
+    if (type === "checkbox") {
+      const checked = (e.target as HTMLInputElement).checked
+      setForm((p) => ({ ...p, [name]: checked }))
+    } else if (name === "unitsPerPack" || name === "unitPrice" || name === "casePrice" || name === "maxQtyPerOrder" || name === "liquidVolumeMl" || name === "nicotineStrengthMg") {
       const num = parseFloat(value) || 0
       setForm((p) => ({ ...p, [name]: num }))
     } else {
@@ -76,6 +82,9 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
         maxQtyPerOrder: 100,
         badge: "",
         imageUrl: "",
+        isSubjectToVapeDuty: true,
+        liquidVolumeMl: 2.0,
+        nicotineStrengthMg: 20.0,
       })
       onSuccess()
       onClose()
@@ -202,6 +211,65 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
           <p className="text-[10px] text-slate-500 leading-snug -mt-1">
             Max wholesale cases one customer can buy per order (enforced in cart and checkout).
           </p>
+
+          {/* Excise & TPD Compliance */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-3.5 text-left">
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              Excise & TPD Compliance
+            </h4>
+            
+            <div className="flex items-center justify-between bg-white border border-slate-150 rounded-xl px-3 py-2.5">
+              <div className="text-left">
+                <p className="text-xs font-bold text-slate-800">Subject to Vape Duty</p>
+                <p className="text-[9px] font-semibold text-slate-400">Excise duty at £2.20 per 10ml liquid</p>
+              </div>
+              <input
+                type="checkbox"
+                name="isSubjectToVapeDuty"
+                checked={form.isSubjectToVapeDuty}
+                onChange={handleChange}
+                className="h-4.5 w-4.5 rounded border-slate-350 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+            </div>
+
+            {form.isSubjectToVapeDuty && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                    E-Liquid Volume (ml)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    name="liquidVolumeMl"
+                    value={form.liquidVolumeMl}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                    required
+                  />
+                  <p className="mt-0.5 text-[8.5px] text-slate-400">Volume per unit (e.g. 2.0 or 10.0)</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                    Nicotine Strength (mg)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    name="nicotineStrengthMg"
+                    value={form.nicotineStrengthMg}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                    required
+                  />
+                  <p className="mt-0.5 text-[8.5px] text-slate-400">Standard max limit is 20.0mg/ml</p>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Image URL (optional)</label>
             <input name="imageUrl" value={form.imageUrl} onChange={handleChange} className="w-full px-3 py-2 border border-slate-200 rounded text-sm font-mono text-[13px]" placeholder="https://… or /brands/elf-bar.png" />

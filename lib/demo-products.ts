@@ -35,8 +35,40 @@ const rawDemoProducts: Omit<Product, "description">[] = [
   { id: "demo-eliq-bar-lm", name: "Bar Salt 20mg Cherry", brand: "Lost Mary", category: "e_liquids", sku: "ELIQ-BS-LM-CH", packLabel: "Box of 10", unitsPerPack: 10, unitPrice: 3.1, casePrice: 31.0 },
 ]
 
-export const demoProducts: Product[] = rawDemoProducts.map((p) => ({
-  ...p,
-  description: DEMO_UK_DESCRIPTION,
-  maxQtyPerOrder: 100,
-}))
+export const demoProducts: Product[] = rawDemoProducts.map((p) => {
+  const isVapeOrLiquid = p.category === "vapes" || p.category === "e_liquids"
+  const name = p.name.toLowerCase()
+  const category = p.category
+
+  let liquidVolumeMl = 0.0
+  let nicotineStrengthMg = 0.0
+
+  if (isVapeOrLiquid) {
+    if (category === "e_liquids") {
+      if (name.includes("10ml")) liquidVolumeMl = 10.0
+      else if (name.includes("50ml")) liquidVolumeMl = 50.0
+      else if (name.includes("100ml")) liquidVolumeMl = 100.0
+      else liquidVolumeMl = 10.0
+    } else {
+      if (name.includes("2400")) liquidVolumeMl = 8.0
+      else if (name.includes("4000") || name.includes("max")) liquidVolumeMl = 10.0
+      else if (name.includes("30k") || name.includes("nera")) liquidVolumeMl = 30.0
+      else liquidVolumeMl = 2.0
+    }
+
+    if (name.includes("shortfill") || name.includes("nicotine-free") || name.includes("nic-free")) {
+      nicotineStrengthMg = 0.0
+    } else {
+      nicotineStrengthMg = 20.0
+    }
+  }
+
+  return {
+    ...p,
+    description: DEMO_UK_DESCRIPTION,
+    maxQtyPerOrder: 100,
+    isSubjectToVapeDuty: isVapeOrLiquid,
+    liquidVolumeMl,
+    nicotineStrengthMg,
+  }
+})

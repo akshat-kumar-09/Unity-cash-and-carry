@@ -39,6 +39,7 @@ export type Product = {
   /** Vaping Products Duty compliance fields */
   liquidVolumeMl?: number
   isSubjectToVapeDuty?: boolean
+  nicotineStrengthMg?: number
 }
 
 const CATEGORY_IMAGES: Record<string, string> = {
@@ -107,6 +108,11 @@ function vape(
   badge?: string,
 ): Product {
   const slug = flavour.toLowerCase().replace(/\s+/g, "-")
+  let liquidVolumeMl = 2.0
+  if (line.includes("2400")) liquidVolumeMl = 8.0
+  else if (line.includes("4000") || line.includes("Max")) liquidVolumeMl = 10.0
+  else if (line.includes("30K")) liquidVolumeMl = 30.0
+
   return {
     id: `${skuPrefix.toLowerCase()}-${slug}`,
     name: `${line} ${flavour}`,
@@ -118,6 +124,9 @@ function vape(
     unitPrice,
     casePrice,
     badge,
+    isSubjectToVapeDuty: true,
+    liquidVolumeMl,
+    nicotineStrengthMg: 20.0,
   }
 }
 
@@ -231,4 +240,14 @@ export const products: Product[] = [
     unitPrice: 0.65,
     casePrice: 31.2,
   },
-]
+].map((p) => {
+  if (p.category !== "vapes" && p.category !== "e_liquids") {
+    return {
+      ...p,
+      isSubjectToVapeDuty: false,
+      liquidVolumeMl: 0.0,
+      nicotineStrengthMg: 0.0,
+    }
+  }
+  return p
+})

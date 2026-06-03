@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     for (const item of parsed.data.items) {
       const product = products.find((p) => p.id === item.productId)!
       if (product.isSubjectToVapeDuty) {
-        vapeDutyAmount += item.quantity * product.liquidVolumeMl * 0.22
+        vapeDutyAmount += item.quantity * product.unitsPerPack * product.liquidVolumeMl * 0.22
       }
     }
     vapeDutyAmount = Math.round(vapeDutyAmount * 100) / 100
