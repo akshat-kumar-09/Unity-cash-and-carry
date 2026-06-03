@@ -109,6 +109,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
+    if (user.role !== 'admin' && user.complianceStatus !== 'approved') {
+      return NextResponse.json({ error: 'Your account is pending compliance verification. Contact Unity to get approved.' }, { status: 403 })
+    }
+
+    let vapeDutyAmount = 0
+    for (const item of parsed.data.items) {
+      const product = products.find((p) => p.id === item.productId)!
+      if (product.isSubjectToVapeDuty) {
+        vapeDutyAmount += item.quantity * product.liquidVolumeMl * 0.22
+      }
+    }
+    vapeDutyAmount = Math.round(vapeDutyAmount * 100) / 100
+
     // Apply promo code discount
     let discountAmount = 0
     if (parsed.data.promoCode) {
@@ -135,8 +148,10 @@ export async function POST(request: NextRequest) {
       discountAmount = Math.round(discountAmount * 100) / 100
     }
 
-    const vat = Math.round((subtotal - discountAmount) * 0.2 * 100) / 100
-    let total = Math.max(0, Math.round((subtotal - discountAmount + vat) * 100) / 100)
+    const taxableAmount = subtotal - discountAmount + vapeDutyAmount
+    const vat = Math.round(taxableAmount * 0.2 * 100) / 100
+    const vatOnDuty = Math.round(vapeDutyAmount * 0.2 * 100) / 100
+    let total = Math.max(0, Math.round((subtotal - discountAmount + vapeDutyAmount + vat) * 100) / 100)
 
     // Deduct wallet credits
     let walletCreditsUsed = 0
@@ -174,6 +189,8 @@ export async function POST(request: NextRequest) {
           subtotal,
           vat,
           total,
+          vapeDutyAmount,
+          vatOnDuty,
           customerName: user.name ?? undefined,
           customerEmail: user.email,
           customerPhone: parsed.data.customerPhone,

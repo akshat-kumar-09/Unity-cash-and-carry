@@ -36,6 +36,9 @@ export type Product = {
   imageUrl?: string | null
   /** Available cases in stock. */
   stock?: number
+  /** Vaping Products Duty compliance fields */
+  liquidVolumeMl?: number
+  isSubjectToVapeDuty?: boolean
 }
 
 const CATEGORY_IMAGES: Record<string, string> = {

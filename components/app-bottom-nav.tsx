@@ -1,10 +1,10 @@
 "use client"
 
-import { Store, Package, Tag, Wallet, User } from "lucide-react"
+import { Store, Package, Tag, Wallet, User, Shield } from "lucide-react"
 
-export type AppTab = "shop" | "orders" | "offers" | "wallet" | "account"
+export type AppTab = "shop" | "orders" | "offers" | "wallet" | "account" | "admin"
 
-const tabs: { id: AppTab; label: string; icon: typeof Store }[] = [
+const traderTabs: { id: AppTab; label: string; icon: typeof Store }[] = [
   { id: "shop", label: "Shop", icon: Store },
   { id: "orders", label: "Orders", icon: Package },
   { id: "offers", label: "Offers", icon: Tag },
@@ -12,12 +12,22 @@ const tabs: { id: AppTab; label: string; icon: typeof Store }[] = [
   { id: "account", label: "Account", icon: User },
 ]
 
+const adminTabs: { id: AppTab; label: string; icon: typeof Store }[] = [
+  { id: "shop", label: "Shop", icon: Store },
+  { id: "orders", label: "Orders", icon: Package },
+  { id: "admin", label: "Admin", icon: Shield },
+  { id: "wallet", label: "Wallet", icon: Wallet },
+  { id: "account", label: "Account", icon: User },
+]
+
 type AppBottomNavProps = {
   activeTab: AppTab
   onTabChange: (tab: AppTab) => void
+  isAdmin?: boolean
 }
 
-export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
+export function AppBottomNav({ activeTab, onTabChange, isAdmin = false }: AppBottomNavProps) {
+  const tabs = isAdmin ? adminTabs : traderTabs
   const activeIndex = tabs.findIndex((tab) => tab.id === activeTab)
 
   return (
@@ -26,20 +36,17 @@ export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
       role="navigation"
       aria-label="Main"
     >
-      {/* Max width container for button alignment */}
       <div className="relative mx-auto max-w-4xl px-1">
-        {/* Sliding Laser Indicator Line at the Top of the Bar */}
+        {/* Sliding Laser Indicator Line */}
         <div
           className="absolute top-[-4px] h-[3px] transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]"
           style={{
-            width: "20%",
+            width: `${100 / tabs.length}%`,
             left: 0,
             transform: `translateX(${activeIndex * 100}%)`,
           }}
         >
-          {/* Core high-intensity light bar */}
           <div className="mx-3 h-full rounded-full bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-600 shadow-[0_0_12px_rgba(37,99,235,0.8),0_0_4px_rgba(6,182,212,0.6)]" />
-          {/* Flared glow overlay */}
           <div className="absolute inset-0 mx-2 bg-cyan-400 blur-[3px] opacity-40" />
         </div>
 
@@ -59,11 +66,9 @@ export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
                 aria-current={isActive ? "page" : undefined}
                 aria-label={label}
               >
-                {/* Shiny radial light bloom behind active icon */}
                 {isActive && (
                   <div className="absolute w-10 h-10 rounded-full bg-blue-500/10 blur-[8px] scale-125 pointer-events-none transition-all duration-500 animate-pulse" />
                 )}
-
                 <Icon
                   className={`h-[22px] w-[22px] transition-all duration-300 ${
                     isActive
@@ -78,8 +83,6 @@ export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
                 >
                   {label}
                 </span>
-
-                {/* Sub-dot active indicator */}
                 <span
                   className={`absolute bottom-0.5 h-1 w-1 rounded-full bg-blue-600 transition-all duration-300 ${
                     isActive ? "scale-100 opacity-100" : "scale-0 opacity-0"

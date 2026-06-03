@@ -16,13 +16,23 @@ model User {
   name          String?
   password      String
   tradeCode     String?   @unique
-  role          String    @default("customer") // admin, trader, customer
+  role          String    @default("customer") // admin, trader, customer, rep
   walletBalance Float     @default(45.00)
+  // HMRC Compliance — retailers must be verified before ordering
+  vatNumber              String?
+  companyNumber          String?
+  companyName            String?
+  retailerLicenseRef     String?
+  complianceStatus       String    @default("pending")  // "pending" | "approved" | "blocked"
+  complianceNotes        String?
+  assignedRepId          String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   orders        Order[]
   walletTransactions WalletTransaction[]
   stockSubscriptions StockSubscription[]
+  capturedLeads      RetailerLead[] @relation("CapturedLeads")
+  repVisits          RouteVisit[]   @relation("RepVisits")
 }
 
 model Product {
@@ -43,10 +53,14 @@ model Product {
   imageUrl      String?
   isActive      Boolean   @default(true)
   stock         Int       @default(100)
+  // VPD duty fields
+  liquidVolumeMl      Float     @default(2.00)
+  isSubjectToVapeDuty Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   orderItems    OrderItem[]
   stockSubscriptions StockSubscription[]
+  warehouseExtractions WarehouseExtraction[]
 }
 
 model Order {
@@ -66,6 +80,9 @@ model Order {
   promoCode          String?
   discountAmount     Float @default(0.00)
   walletCreditsUsed  Float @default(0.00)
+  // VPD duty tracking
+  vapeDutyAmount     Float @default(0.00)
+  vatOnDuty          Float @default(0.00)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   items         OrderItem[]
@@ -113,4 +130,56 @@ model StockSubscription {
   email       String
   createdAt   DateTime @default(now())
   @@unique([userId, productId])
+}
+
+// ─── HMRC Duty-Suspension Warehouse ─────────────────────────────────────────
+// Tracks every stock extraction from the HMRC bonded warehouse.
+// Duty is triggered ONLY when Unity pulls stock out for sale.
+model WarehouseExtraction {
+  id              String   @id @default(cuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  quantityUnits   Int
+  liquidVolumeMl  Float    // per-unit volume at time of extraction
+  totalVolumeMl   Float    // quantityUnits * liquidVolumeMl
+  dutyPerUnit     Float    // liquidVolumeMl * 0.22
+  totalDuty       Float    // quantityUnits * dutyPerUnit
+  extractedAt     DateTime @default(now())
+  extractedBy     String   // admin user ID
+  hmrcPeriod      String   // e.g. "2026-10" for monthly grouping
+  notes           String?
+}
+
+// ─── Sales Rep CRM ──────────────────────────────────────────────────────────
+// Retailer contacts captured by sales reps in the field — NOT in personal phones.
+model RetailerLead {
+  id              String   @id @default(cuid())
+  businessName    String
+  contactName     String
+  phone           String
+  email           String?
+  address         String
+  postcode        String
+  city            String
+  lat             Float?
+  lng             Float?
+  notes           String?
+  status          String   @default("prospect") // "prospect" | "contacted" | "pitched" | "onboarded" | "declined"
+  capturedById    String
+  capturedBy      User     @relation("CapturedLeads", fields: [capturedById], references: [id])
+  visits          RouteVisit[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  followUpDate    DateTime?
+}
+
+model RouteVisit {
+  id              String   @id @default(cuid())
+  repId           String
+  rep             User     @relation("RepVisits", fields: [repId], references: [id])
+  leadId          String
+  lead            RetailerLead @relation(fields: [leadId], references: [id])
+  visitedAt       DateTime @default(now())
+  outcome         String   // "pitched" | "follow_up" | "onboarded" | "not_interested"
+  notes           String?
 }

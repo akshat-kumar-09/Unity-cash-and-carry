@@ -88,8 +88,19 @@ export function CartFooter() {
   // Calculate totals
   const discountAmount = appliedPromo ? appliedPromo.discountAmount : 0
   const updatedSubtotal = Math.max(0, subtotal - discountAmount)
-  const updatedVat = Math.round(updatedSubtotal * 0.2 * 100) / 100
-  const preWalletTotal = Math.round((updatedSubtotal + updatedVat) * 100) / 100
+  
+  // Calculate live Vape Product Duty (VPD)
+  const vapeDutyAmount = items.reduce((acc, item) => {
+    if (item.product.isSubjectToVapeDuty) {
+      const vol = item.product.liquidVolumeMl ?? 2.0
+      return acc + item.quantity * vol * 0.22
+    }
+    return acc
+  }, 0)
+  const roundedVapeDuty = Math.round(vapeDutyAmount * 100) / 100
+
+  const updatedVat = Math.round((updatedSubtotal + roundedVapeDuty) * 0.2 * 100) / 100
+  const preWalletTotal = Math.round((updatedSubtotal + roundedVapeDuty + updatedVat) * 100) / 100
   const creditsToUse = useWalletCredits ? Math.min(walletBalance, preWalletTotal) : 0
   const finalTotal = Math.round((preWalletTotal - creditsToUse) * 100) / 100
 
@@ -464,9 +475,20 @@ export function CartFooter() {
                       </div>
                     )}
 
+                    {roundedVapeDuty > 0 && (
+                      <div className="flex items-center justify-between text-amber-700">
+                        <span className="text-xs uppercase font-mono font-bold">
+                          Vaping Products Duty
+                        </span>
+                        <span className="text-sm font-mono font-bold">
+                          +£{roundedVapeDuty.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-slate-500 uppercase font-mono">
-                        VAT (20%)
+                        VAT (20% inc. Duty)
                       </span>
                       <span className="text-sm font-mono text-slate-700">
                         £{updatedVat.toFixed(2)}

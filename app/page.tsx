@@ -11,6 +11,51 @@ import { WalletView } from "@/components/wallet-view"
 import { AccountView } from "@/components/account-view"
 import { CartProvider } from "@/lib/cart-context"
 import { TradeProvider, useTrade } from "@/lib/trade-context"
+import { AdminDashboardView } from "@/components/admin-dashboard-view"
+import { AdminWarehouseView } from "@/components/admin-warehouse-view"
+import { AdminLeadsView } from "@/components/admin-leads-view"
+import { AdminRoutePlannerView } from "@/components/admin-route-planner-view"
+import { AdminComplianceView } from "@/components/admin-compliance-view"
+import { AdminReportsView } from "@/components/admin-reports-view"
+
+export type AdminSection = "dashboard" | "warehouse" | "leads" | "routes" | "compliance" | "reports"
+
+function AdminView() {
+  const [section, setSection] = useState<AdminSection>("dashboard")
+
+  return (
+    <>
+      {section === "dashboard" && (
+        <AdminDashboardView activeSection={section} onSectionChange={setSection} />
+      )}
+      {section === "warehouse" && (
+        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
+          <AdminWarehouseView />
+        </AdminDashboardView>
+      )}
+      {section === "leads" && (
+        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
+          <AdminLeadsView />
+        </AdminDashboardView>
+      )}
+      {section === "routes" && (
+        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
+          <AdminRoutePlannerView />
+        </AdminDashboardView>
+      )}
+      {section === "compliance" && (
+        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
+          <AdminComplianceView />
+        </AdminDashboardView>
+      )}
+      {section === "reports" && (
+        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
+          <AdminReportsView />
+        </AdminDashboardView>
+      )}
+    </>
+  )
+}
 
 function AppShell() {
   const { isAdmin } = useTrade()
@@ -30,8 +75,9 @@ function AppShell() {
       {activeTab === "offers" && <OffersView />}
       {activeTab === "wallet" && <WalletView />}
       {activeTab === "account" && <AccountView />}
+      {activeTab === "admin" && isAdmin && <AdminView />}
 
-      <AppBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <AppBottomNav activeTab={activeTab} onTabChange={setActiveTab} isAdmin={isAdmin} />
     </div>
   )
 }
