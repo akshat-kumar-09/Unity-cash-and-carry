@@ -7,7 +7,7 @@ import { AppBottomNav, type AppTab } from "@/components/app-bottom-nav"
 import { ShopView } from "@/components/shop-view"
 import { OrdersView } from "@/components/orders-view"
 import { OffersView } from "@/components/offers-view"
-import { WalletView } from "@/components/wallet-view"
+import { RetailAssistView } from "@/components/retail-assist-view"
 import { AccountView } from "@/components/account-view"
 import { CartProvider } from "@/lib/cart-context"
 import { TradeProvider, useTrade } from "@/lib/trade-context"
@@ -73,7 +73,7 @@ function AppShell() {
       )}
       {activeTab === "orders" && <OrdersView />}
       {activeTab === "offers" && <OffersView />}
-      {activeTab === "wallet" && <WalletView />}
+      {activeTab === "assist" && <RetailAssistView />}
       {activeTab === "account" && <AccountView />}
       {activeTab === "admin" && isAdmin && <AdminView />}
 

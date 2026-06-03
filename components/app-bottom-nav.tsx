@@ -1,14 +1,14 @@
 "use client"
 
-import { Store, Package, Tag, Wallet, User, Shield } from "lucide-react"
+import { Store, Package, Tag, User, Shield, HeartHandshake } from "lucide-react"
 
-export type AppTab = "shop" | "orders" | "offers" | "wallet" | "account" | "admin"
+export type AppTab = "shop" | "orders" | "offers" | "assist" | "account" | "admin"
 
 const traderTabs: { id: AppTab; label: string; icon: typeof Store }[] = [
   { id: "shop", label: "Shop", icon: Store },
   { id: "orders", label: "Orders", icon: Package },
-  { id: "offers", label: "Offers", icon: Tag },
-  { id: "wallet", label: "Wallet", icon: Wallet },
+  { id: "offers", label: "Rewards", icon: Tag },
+  { id: "assist", label: "Assist", icon: HeartHandshake },
   { id: "account", label: "Account", icon: User },
 ]
 
@@ -16,7 +16,7 @@ const adminTabs: { id: AppTab; label: string; icon: typeof Store }[] = [
   { id: "shop", label: "Shop", icon: Store },
   { id: "orders", label: "Orders", icon: Package },
   { id: "admin", label: "Admin", icon: Shield },
-  { id: "wallet", label: "Wallet", icon: Wallet },
+  { id: "assist", label: "Assist", icon: HeartHandshake },
   { id: "account", label: "Account", icon: User },
 ]
 
