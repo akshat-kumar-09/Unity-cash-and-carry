@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Package, Truck, X, Trash2, CheckCircle, Minus, Plus, ArrowLeft } from "lucide-react"
 import { useCart } from "@/lib/cart-context"
 import { useSession } from "next-auth/react"
@@ -38,6 +38,61 @@ export function CartFooter() {
   const [formData, setFormData] = useState<CheckoutFormData>(initialForm)
   const [formError, setFormError] = useState("")
 
+  // Wallet and Promo states
+  const [walletBalance, setWalletBalance] = useState(0)
+  const [useWalletCredits, setUseWalletCredits] = useState(false)
+  const [promoCodeInput, setPromoCodeInput] = useState("")
+  const [appliedPromo, setAppliedPromo] = useState<any>(null)
+  const [promoError, setPromoError] = useState("")
+
+  // Fetch wallet balance when cart opens
+  useEffect(() => {
+    if (isCartOpen && session) {
+      fetch("/api/wallet")
+        .then((res) => res.json())
+        .then((data) => setWalletBalance(data.balance))
+        .catch((err) => console.error("Error loading wallet balance for cart:", err))
+    }
+  }, [isCartOpen, session])
+
+  const handleApplyPromo = async () => {
+    setPromoError("")
+    if (!promoCodeInput.trim()) return
+
+    try {
+      const res = await fetch("/api/promo/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: promoCodeInput.trim(),
+          subtotal,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || "Invalid promo code")
+      }
+      setAppliedPromo(data)
+      setPromoCodeInput("")
+    } catch (err: any) {
+      setPromoError(err.message)
+      setAppliedPromo(null)
+    }
+  }
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null)
+    setPromoError("")
+  }
+
+  // Calculate totals
+  const discountAmount = appliedPromo ? appliedPromo.discountAmount : 0
+  const updatedSubtotal = Math.max(0, subtotal - discountAmount)
+  const updatedVat = Math.round(updatedSubtotal * 0.2 * 100) / 100
+  const preWalletTotal = Math.round((updatedSubtotal + updatedVat) * 100) / 100
+  const creditsToUse = useWalletCredits ? Math.min(walletBalance, preWalletTotal) : 0
+  const finalTotal = Math.round((preWalletTotal - creditsToUse) * 100) / 100
+
   if (totalItems === 0 && !isCartOpen) return null
 
   const handlePlaceOrderClick = () => {
@@ -67,6 +122,8 @@ export function CartFooter() {
         customerPhone: customerPhone.trim(),
         shippingAddress: shippingAddress.trim(),
         notes: notes.trim() || undefined,
+        promoCode: appliedPromo ? appliedPromo.code : undefined,
+        useWalletCredits,
       }
 
       const response = await fetch("/api/orders", {
@@ -87,6 +144,8 @@ export function CartFooter() {
         setShowCheckoutForm(false)
         setOrderPlaced(false)
         setFormData(initialForm)
+        setAppliedPromo(null)
+        setUseWalletCredits(false)
       }, 2500)
     } catch (error) {
       console.error("Error placing order:", error)
@@ -120,7 +179,7 @@ export function CartFooter() {
                 </p>
                 <p className="text-sm font-bold text-white font-mono">
                   {"£"}
-                  {total.toFixed(2)}
+                  {finalTotal.toFixed(2)}
                   {" inc. VAT"}
                 </p>
               </div>
@@ -324,6 +383,65 @@ export function CartFooter() {
                     </span>
                   </div>
 
+                  {/* Promo & Wallet Inputs */}
+                  <div className="px-4 py-3 border-b border-slate-100 space-y-3 bg-slate-50/50">
+                    {/* Promo Code Input */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Voucher Code</label>
+                      {appliedPromo ? (
+                        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-150 rounded-xl px-3.5 py-2">
+                          <div className="text-left">
+                            <span className="font-mono font-black text-emerald-800 text-xs mr-2">{appliedPromo.code}</span>
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Applied</span>
+                          </div>
+                          <button 
+                            type="button" 
+                            onClick={handleRemovePromo} 
+                            className="text-xs font-bold text-slate-500 hover:text-red-600 transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="e.g. WELCOME20"
+                            value={promoCodeInput}
+                            onChange={(e) => setPromoCodeInput(e.target.value)}
+                            className="flex-1 px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-mono uppercase focus:outline-none focus:border-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyPromo}
+                            className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all active:scale-95"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      )}
+                      {promoError && (
+                        <p className="text-[11px] text-red-600 font-medium text-left">{promoError}</p>
+                      )}
+                    </div>
+
+                    {/* Wallet Credits Toggle */}
+                    {walletBalance > 0 && (
+                      <div className="flex items-center justify-between py-1 bg-white border border-slate-150 rounded-xl px-3.5 py-2.5">
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-slate-800">Use Wallet Credits</p>
+                          <p className="text-[10px] font-semibold text-slate-450">Available balance: £{walletBalance.toFixed(2)}</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={useWalletCredits}
+                          onChange={(e) => setUseWalletCredits(e.target.checked)}
+                          className="h-4.5 w-4.5 rounded border-slate-350 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </div>
+                    )}
+                  </div>
+
                   {/* VAT Breakdown */}
                   <div className="px-4 py-3 flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
@@ -331,26 +449,47 @@ export function CartFooter() {
                         Subtotal (ex. VAT)
                       </span>
                       <span className="text-sm font-mono font-bold text-slate-800">
-                        {"£"}
-                        {subtotal.toFixed(2)}
+                        £{subtotal.toFixed(2)}
                       </span>
                     </div>
+
+                    {discountAmount > 0 && (
+                      <div className="flex items-center justify-between text-emerald-600">
+                        <span className="text-xs uppercase font-mono font-bold">
+                          Promo Discount
+                        </span>
+                        <span className="text-sm font-mono font-bold">
+                          -£{discountAmount.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-slate-500 uppercase font-mono">
                         VAT (20%)
                       </span>
                       <span className="text-sm font-mono text-slate-700">
-                        {"£"}
-                        {vat.toFixed(2)}
+                        £{updatedVat.toFixed(2)}
                       </span>
                     </div>
+
+                    {creditsToUse > 0 && (
+                      <div className="flex items-center justify-between text-blue-600">
+                        <span className="text-xs uppercase font-mono font-bold">
+                          Credits Applied
+                        </span>
+                        <span className="text-sm font-mono font-bold">
+                          -£{creditsToUse.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between pt-2 border-t border-slate-200">
                       <span className="text-sm font-bold text-slate-800 uppercase">
                         Total
                       </span>
                       <span className="text-xl font-bold font-mono text-blue-700">
-                        {"£"}
-                        {total.toFixed(2)}
+                        £{finalTotal.toFixed(2)}
                       </span>
                     </div>
                   </div>

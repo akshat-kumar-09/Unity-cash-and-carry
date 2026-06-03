@@ -17,9 +17,12 @@ model User {
   password      String
   tradeCode     String?   @unique
   role          String    @default("customer") // admin, trader, customer
+  walletBalance Float     @default(0.00)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   orders        Order[]
+  walletTransactions WalletTransaction[]
+  stockSubscriptions StockSubscription[]
 }
 
 model Product {
@@ -39,9 +42,11 @@ model Product {
   badge         String?
   imageUrl      String?
   isActive      Boolean   @default(true)
+  stock         Int       @default(100)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   orderItems    OrderItem[]
+  stockSubscriptions StockSubscription[]
 }
 
 model Order {
@@ -58,6 +63,9 @@ model Order {
   customerPhone   String?
   shippingAddress String?
   notes           String?
+  promoCode          String?
+  discountAmount     Float @default(0.00)
+  walletCreditsUsed  Float @default(0.00)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   items         OrderItem[]
@@ -73,4 +81,36 @@ model OrderItem {
   unitPrice     Float
   totalPrice    Float
   createdAt     DateTime  @default(now())
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Float
+  type        String   // "promo_reward", "order_deduction", "admin_adjustment", "deposit"
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model PromoCode {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  description   String
+  discountType  String   // "percentage", "fixed_amount"
+  value         Float
+  minOrderValue Float    @default(0.00)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+model StockSubscription {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  email       String
+  createdAt   DateTime @default(now())
+  @@unique([userId, productId])
 }

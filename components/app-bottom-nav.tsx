@@ -18,13 +18,25 @@ type AppBottomNavProps = {
 }
 
 export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTab)
+
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/90 bg-white/95 backdrop-blur-md pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(15,23,42,0.08)]"
+      className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-1.75rem)] max-w-[480px] rounded-2xl border border-white/10 bg-slate-900/95 p-1.5 shadow-[0_20px_50px_rgba(15,23,42,0.35)] backdrop-blur-xl"
       role="navigation"
       aria-label="Main"
     >
-      <div className="mx-auto flex max-w-4xl items-stretch justify-around px-1">
+      <div className="relative flex items-center justify-between">
+        {/* Animated Sliding Background Indicator */}
+        <div
+          className="absolute bottom-0 top-0 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] -z-10 shadow-[0_4px_16px_rgba(37,99,235,0.45)]"
+          style={{
+            width: "20%",
+            left: 0,
+            transform: `translateX(${activeIndex * 100}%) scale(0.92, 0.9)`,
+          }}
+        />
+
         {tabs.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id
           return (
@@ -32,30 +44,35 @@ export function AppBottomNav({ activeTab, onTabChange }: AppBottomNavProps) {
               key={id}
               type="button"
               onClick={() => onTabChange(id)}
-              className={`unity-tap relative flex min-h-[56px] min-w-[56px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl py-1.5 transition-colors ${
+              className={`unity-tap relative flex h-[58px] flex-1 flex-col items-center justify-center gap-1 rounded-xl transition-all duration-300 ${
                 isActive
-                  ? "text-blue-700"
-                  : "text-slate-400 hover:text-slate-600"
+                  ? "text-white scale-105"
+                  : "text-slate-400 hover:text-slate-200 active:scale-95"
               }`}
               aria-current={isActive ? "page" : undefined}
               aria-label={label}
             >
-              {isActive && (
-                <span
-                  className="absolute inset-x-3 top-1 h-1 rounded-full bg-blue-600/90"
-                  aria-hidden
-                />
-              )}
               <Icon
-                className={`h-6 w-6 ${isActive ? "stroke-[2.25px]" : "stroke-[1.75px]"}`}
+                className={`h-5 w-5 transition-all duration-300 ${
+                  isActive 
+                    ? "stroke-[2.25px] scale-110 drop-shadow-[0_2px_6px_rgba(255,255,255,0.25)]" 
+                    : "stroke-[1.75px]"
+                }`}
               />
               <span
-                className={`text-[10px] font-bold uppercase tracking-wide ${
-                  isActive ? "text-blue-800" : ""
+                className={`text-[9px] font-black uppercase tracking-widest transition-all duration-300 ${
+                  isActive ? "text-white opacity-100" : "opacity-80"
                 }`}
               >
                 {label}
               </span>
+              
+              {/* Discrete indicator dot below label */}
+              <span 
+                className={`absolute bottom-1 h-1 w-1 rounded-full bg-white transition-all duration-300 ${
+                  isActive ? "scale-100 opacity-80" : "scale-0 opacity-0"
+                }`}
+              />
             </button>
           )
         })}

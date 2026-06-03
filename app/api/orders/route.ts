@@ -101,36 +101,99 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    const vat = subtotal * 0.2
-    const total = subtotal + vat
+    // Fetch user for wallet balance
+    const user = await prisma.user.findUnique({
+      where: { id: (session.user as any).id },
+    })
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    // Apply promo code discount
+    let discountAmount = 0
+    if (parsed.data.promoCode) {
+      const appliedPromo = await prisma.promoCode.findUnique({
+        where: { code: parsed.data.promoCode.toUpperCase().trim(), isActive: true },
+      })
+      if (!appliedPromo) {
+        return NextResponse.json(
+          { error: "Invalid or inactive promo code" },
+          { status: 400 }
+        )
+      }
+      if (subtotal < appliedPromo.minOrderValue) {
+        return NextResponse.json(
+          { error: `Minimum order value for ${appliedPromo.code} is £${appliedPromo.minOrderValue.toFixed(2)}` },
+          { status: 400 }
+        )
+      }
+      if (appliedPromo.discountType === "percentage") {
+        discountAmount = subtotal * (appliedPromo.value / 100)
+      } else {
+        discountAmount = Math.min(appliedPromo.value, subtotal)
+      }
+      discountAmount = Math.round(discountAmount * 100) / 100
+    }
+
+    const vat = Math.round((subtotal - discountAmount) * 0.2 * 100) / 100
+    let total = Math.max(0, Math.round((subtotal - discountAmount + vat) * 100) / 100)
+
+    // Deduct wallet credits
+    let walletCreditsUsed = 0
+    if (parsed.data.useWalletCredits && user.walletBalance > 0) {
+      walletCreditsUsed = Math.min(user.walletBalance, total)
+      walletCreditsUsed = Math.round(walletCreditsUsed * 100) / 100
+      total = Math.round((total - walletCreditsUsed) * 100) / 100
+    }
 
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
 
-    // Create order
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        userId: (session.user as any).id,
-        subtotal,
-        vat,
-        total,
-        customerName: (session.user as any).name ?? undefined,
-        customerEmail: (session.user as any).email ?? undefined,
-        customerPhone: parsed.data.customerPhone,
-        shippingAddress: parsed.data.shippingAddress,
-        notes: parsed.data.notes,
-        items: {
-          create: orderItems,
-        },
-      },
-      include: {
-        items: {
-          include: {
-            product: true,
+    // Create order within transaction
+    const order = await prisma.$transaction(async (tx) => {
+      if (walletCreditsUsed > 0) {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { walletBalance: { decrement: walletCreditsUsed } },
+        })
+
+        await tx.walletTransaction.create({
+          data: {
+            userId: user.id,
+            amount: -walletCreditsUsed,
+            type: "order_deduction",
+            description: `Deducted for order ${orderNumber}`,
+          },
+        })
+      }
+
+      return tx.order.create({
+        data: {
+          orderNumber,
+          userId: user.id,
+          subtotal,
+          vat,
+          total,
+          customerName: user.name ?? undefined,
+          customerEmail: user.email,
+          customerPhone: parsed.data.customerPhone,
+          shippingAddress: parsed.data.shippingAddress,
+          notes: parsed.data.notes,
+          promoCode: parsed.data.promoCode?.toUpperCase().trim() ?? null,
+          discountAmount,
+          walletCreditsUsed,
+          items: {
+            create: orderItems,
           },
         },
-      },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      })
     })
 
     return NextResponse.json(order, { status: 201 })

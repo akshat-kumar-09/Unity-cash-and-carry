@@ -11,6 +11,7 @@ export type CartItem = {
 type CartContextType = {
   items: CartItem[]
   addItem: (product: Product) => void
+  addItems: (itemsToAdd: { product: Product; quantity: number }[]) => void
   removeItem: (productId: string) => void
   getQuantity: (productId: string) => number
   totalItems: number
@@ -123,6 +124,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const vat = subtotal * 0.2
   const total = subtotal + vat
 
+  const addItems = useCallback((itemsToAdd: { product: Product; quantity: number }[]) => {
+    setItems((prev) => {
+      const updated = [...prev]
+      for (const item of itemsToAdd) {
+        const maxQ = getEffectiveMaxQtyPerOrder(item.product)
+        const idx = updated.findIndex((i) => i.product.id === item.product.id)
+        if (idx > -1) {
+          updated[idx] = {
+            ...updated[idx],
+            quantity: Math.min(updated[idx].quantity + item.quantity, maxQ)
+          }
+        } else {
+          updated.push({
+            product: item.product,
+            quantity: Math.min(item.quantity, maxQ)
+          })
+        }
+      }
+      return updated
+    })
+  }, [])
+
   const clearCart = useCallback(() => {
     setItems([])
     if (typeof window !== "undefined") {
@@ -138,6 +161,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       value={{
         items,
         addItem,
+        addItems,
         removeItem,
         getQuantity,
         totalItems,

@@ -33,6 +33,7 @@ export function BulkEditProductsModal({
   onClose,
   onSuccess,
 }: BulkEditProductsModalProps) {
+  const [description, setDescription] = useState("")
   const [casePriceStr, setCasePriceStr] = useState("")
   const [unitPriceStr, setUnitPriceStr] = useState("")
   const [unitsPerPackStr, setUnitsPerPackStr] = useState("")
@@ -43,6 +44,7 @@ export function BulkEditProductsModal({
 
   useEffect(() => {
     if (isOpen) {
+      setDescription("")
       setCasePriceStr("")
       setUnitPriceStr("")
       setUnitsPerPackStr("")
@@ -99,14 +101,22 @@ export function BulkEditProductsModal({
       return
     }
 
+    const descTrim = description.trim()
+    if (descTrim.length > 0 && descTrim.length < 20) {
+      setError("UK product description must be at least 20 characters, or leave blank to skip.")
+      return
+    }
+
     const payload: {
       productIds: string[]
+      description?: string
       casePrice?: number
       unitPrice?: number
       unitsPerPack?: number
       packLabel?: string
       maxQtyPerOrder?: number
     } = { productIds: selectedIds }
+    if (descTrim.length >= 20) payload.description = descTrim
     if (casePrice !== undefined) payload.casePrice = casePrice
     if (unitPrice !== undefined) payload.unitPrice = unitPrice
     if (unitsPerPack !== undefined) payload.unitsPerPack = unitsPerPack
@@ -179,6 +189,21 @@ export function BulkEditProductsModal({
               Only fill fields you want to change — the same values will be applied to every selected product.
             </p>
             {error && <p className="text-xs font-medium text-red-600">{error}</p>}
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase text-slate-600">
+                Product description (UK product information)
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                className="min-h-[88px] w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm leading-relaxed"
+                placeholder="Leave blank to keep each product’s current description"
+              />
+              <p className="mt-1 text-[10px] leading-snug text-slate-500">
+                If filled, this exact text replaces the description on every selected product (min. 20 characters).
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-[10px] font-bold uppercase text-slate-600">

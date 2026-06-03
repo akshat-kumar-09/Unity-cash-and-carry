@@ -34,6 +34,8 @@ export type Product = {
   isActive?: boolean
   /** Product image URL. Use getProductImageUrl() for placeholder when missing. */
   imageUrl?: string | null
+  /** Available cases in stock. */
+  stock?: number
 }
 
 const CATEGORY_IMAGES: Record<string, string> = {

@@ -47,32 +47,66 @@ async function main() {
   console.log('Seeding database...')
 
   const adminPassword = await bcrypt.hash('admin123', 10)
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: 'admin@unitycashandcarry.com' },
-    update: {},
+    update: {
+      walletBalance: 250.00,
+    },
     create: {
       email: 'admin@unitycashandcarry.com',
       name: 'Admin User',
       password: adminPassword,
       role: 'admin',
       tradeCode: 'BESTINGLASGOW',
+      walletBalance: 250.00,
     },
   })
   console.log('Created admin user')
 
+  const existingTxAdmin = await prisma.walletTransaction.findFirst({
+    where: { userId: admin.id, type: 'deposit' }
+  })
+  if (!existingTxAdmin) {
+    await prisma.walletTransaction.create({
+      data: {
+        userId: admin.id,
+        amount: 250.00,
+        type: 'deposit',
+        description: 'Initial admin account balance credit'
+      }
+    })
+  }
+
   const traderPassword = await bcrypt.hash('trader123', 10)
-  await prisma.user.upsert({
+  const trader = await prisma.user.upsert({
     where: { email: 'trader@example.com' },
-    update: {},
+    update: {
+      walletBalance: 120.00,
+    },
     create: {
       email: 'trader@example.com',
       name: 'Demo Trader',
       password: traderPassword,
       role: 'trader',
       tradeCode: 'TRUSTANDUNITY',
+      walletBalance: 120.00,
     },
   })
   console.log('Created trader user')
+
+  const existingTxTrader = await prisma.walletTransaction.findFirst({
+    where: { userId: trader.id, type: 'promo_reward' }
+  })
+  if (!existingTxTrader) {
+    await prisma.walletTransaction.create({
+      data: {
+        userId: trader.id,
+        amount: 120.00,
+        type: 'promo_reward',
+        description: 'First sign-up trade voucher reward'
+      }
+    })
+  }
 
   const products: { name: string; brand: string; category: string; sku: string; packLabel: string; unitsPerPack: number; unitPrice: number; casePrice: number; badge?: string }[] = []
   const usedSkus = new Set<string>()
@@ -226,10 +260,11 @@ async function main() {
     })
   }
 
-  const toSeed = products.slice(0, 500).map((p) => ({
+  const toSeed = products.slice(0, 500).map((p, i) => ({
     ...p,
     description: SEED_PRODUCT_DESCRIPTION,
     maxQtyPerOrder: 100,
+    stock: i % 15 === 0 ? 0 : 80 + (i % 50),
   }))
   for (const product of toSeed) {
     await prisma.product.upsert({
@@ -240,6 +275,20 @@ async function main() {
   }
 
   console.log(`Seeded ${toSeed.length} products`)
+
+  const promoCodes = [
+    { code: 'WELCOME20', description: '£20 trade credit discount on first wholesale order', discountType: 'fixed_amount', value: 20.00, minOrderValue: 100.00 },
+    { code: 'GLASGOW10', description: '10% discount on orders over £50', discountType: 'percentage', value: 10.00, minOrderValue: 50.00 },
+    { code: 'VAPE5', description: '5% off all vape brand cases', discountType: 'percentage', value: 5.00, minOrderValue: 0.00 },
+  ]
+  for (const promo of promoCodes) {
+    await prisma.promoCode.upsert({
+      where: { code: promo.code },
+      update: promo,
+      create: promo,
+    })
+  }
+  console.log('Seeded promo codes')
   console.log('Seeding complete!')
 }
 

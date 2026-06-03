@@ -41,6 +41,8 @@ export const createOrderSchema = z.object({
   shippingAddress: z.string().min(1),
   customerPhone: z.string().min(1),
   notes: z.string().optional(),
+  promoCode: z.string().optional(),
+  useWalletCredits: z.boolean().optional(),
 })
 
 export const createGuestOrderSchema = z.object({
@@ -105,6 +107,11 @@ export const updateProductSchema = z
 export const bulkUpdateProductsSchema = z
   .object({
     productIds: z.array(z.string().min(1)).min(1).max(300),
+    description: z
+      .string()
+      .min(20, "Description must be at least 20 characters (UK product information).")
+      .max(8000)
+      .optional(),
     casePrice: z.number().positive().optional(),
     unitPrice: z.number().positive().optional(),
     unitsPerPack: z.number().int().positive().optional(),
@@ -113,6 +120,7 @@ export const bulkUpdateProductsSchema = z
   })
   .refine(
     (d) =>
+      d.description !== undefined ||
       d.casePrice !== undefined ||
       d.unitPrice !== undefined ||
       d.unitsPerPack !== undefined ||

@@ -1,11 +1,13 @@
 "use client"
 
-import React from "react"
+import React, { useState } from "react"
 
-import { Minus, Plus, Pencil, ShoppingCart, Trash2 } from "lucide-react"
+import { Minus, Plus, Pencil, ShoppingCart, Trash2, Mail } from "lucide-react"
 import type { Product } from "@/lib/products"
 import { getEffectiveMaxQtyPerOrder, getProductImageUrl } from "@/lib/products"
 import { useCart } from "@/lib/cart-context"
+import { useSession } from "next-auth/react"
+import { toast } from "sonner"
 
 export function ProductCard({
   product,
@@ -25,11 +27,48 @@ export function ProductCard({
   bulkSelected?: boolean
   onBulkToggle?: () => void
 }) {
+  const { data: session } = useSession()
   const { addItem, removeItem, getQuantity } = useCart()
   const quantity = getQuantity(product.id)
   const maxPerOrder = getEffectiveMaxQtyPerOrder(product)
   const atMaxQty = quantity >= maxPerOrder
   const imageUrl = getProductImageUrl(product)
+
+  // Notify Me states
+  const [showNotifyModal, setShowNotifyModal] = useState(false)
+  const [emailInput, setEmailInput] = useState(session?.user?.email || "")
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!emailInput.trim()) {
+      toast.error("Please enter a valid email address")
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/products/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          email: emailInput.trim(),
+        }),
+      })
+
+      if (!res.ok) {
+        throw new Error("Failed to subscribe")
+      }
+
+      toast.success(`Subscribed to back-in-stock alerts for ${product.name}!`)
+      setShowNotifyModal(false)
+    } catch (err: any) {
+      toast.error("Could not register notification request")
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const animateIn = index < 24
 
@@ -98,7 +137,11 @@ export function ProductCard({
           className="absolute inset-0 w-full h-full object-contain p-2"
           onError={(e) => { const t = e.currentTarget; if (t.src !== "/placeholder.svg") t.src = "/placeholder.svg"; }}
         />
-        {product.badge && (
+        {product.stock === 0 ? (
+          <span className="absolute right-2 top-2 rounded-md bg-slate-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm">
+            Out of Stock
+          </span>
+        ) : product.badge && (
           <span className="absolute right-2 top-2 rounded-md bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-900 shadow-sm">
             {product.badge}
           </span>
@@ -162,7 +205,16 @@ export function ProductCard({
 
       {/* Quick Add -- large tap targets */}
       <div className="flex items-center border-t border-slate-100">
-        {quantity === 0 ? (
+        {product.stock === 0 ? (
+          <button
+            type="button"
+            onClick={() => setShowNotifyModal(true)}
+            className="flex flex-1 items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 py-3.5 text-xs font-bold uppercase tracking-wider text-white transition"
+          >
+            <Mail className="w-4 h-4 text-blue-300" />
+            Notify Me
+          </button>
+        ) : quantity === 0 ? (
           <button
             type="button"
             onClick={() => addItem(product)}
@@ -201,6 +253,46 @@ export function ProductCard({
           </div>
         )}
       </div>
+
+      {/* Notify Me Modal */}
+      {showNotifyModal && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-150 text-left space-y-4">
+            <div className="flex justify-between items-start">
+              <h3 className="font-bold text-slate-800 text-[15px] leading-tight">Stock Notification</h3>
+              <button
+                type="button"
+                onClick={() => setShowNotifyModal(false)}
+                className="text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-500 leading-relaxed">
+              <strong>{product.name}</strong> is currently out of stock. We will notify you immediately at this email once new boxes arrive in Glasgow.
+            </p>
+
+            <form onSubmit={handleSubscribe} className="space-y-3">
+              <input
+                type="email"
+                placeholder="your.email@business.com"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                required
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-500 font-mono"
+              />
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider py-3 rounded-xl transition-all disabled:opacity-50 active:scale-95"
+              >
+                {submitting ? "Registering..." : "Notify Me When In Stock"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

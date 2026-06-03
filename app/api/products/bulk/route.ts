@@ -40,12 +40,14 @@ export async function POST(request: NextRequest) {
     }
 
     const data: {
+      description?: string
       casePrice?: number
       unitPrice?: number
       unitsPerPack?: number
       packLabel?: string
       maxQtyPerOrder?: number
     } = {}
+    if (patchIn.description !== undefined) data.description = patchIn.description.trim()
     if (patchIn.casePrice !== undefined) data.casePrice = patchIn.casePrice
     if (patchIn.unitPrice !== undefined) data.unitPrice = patchIn.unitPrice
     if (patchIn.unitsPerPack !== undefined) data.unitsPerPack = patchIn.unitsPerPack
