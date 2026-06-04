@@ -272,18 +272,18 @@ export function AdminComplianceView() {
                         </div>
                         <div>
                           <span className="text-slate-400 uppercase font-bold tracking-wider block">
-                            Company Number
+                            Retailer Name
                           </span>
-                          <span className="font-mono font-bold text-slate-700 mt-0.5 block">
-                            {trader.companyNumber || "Not Provided"}
+                          <span className="font-semibold text-slate-700 mt-0.5 block">
+                            {trader.name || "Not Provided"}
                           </span>
                         </div>
                         <div>
                           <span className="text-slate-400 uppercase font-bold tracking-wider block">
-                            Vape Duty License
+                            Email Address
                           </span>
-                          <span className="font-mono font-bold text-slate-700 mt-0.5 block">
-                            {trader.retailerLicenseRef || "Not Provided"}
+                          <span className="font-mono font-semibold text-slate-700 mt-0.5 block">
+                            {trader.email}
                           </span>
                         </div>
                         <div>

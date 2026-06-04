@@ -13,11 +13,11 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyName, name, email, phone, address } = body
+    const { companyName, name, email, phone, address, vatNumber } = body
 
-    if (!email || !companyName || !name) {
+    if (!email || !companyName || !name || !vatNumber) {
       return new NextResponse(
-        JSON.stringify({ error: "Email, Business Identity, and Lead Name are required" }),
+        JSON.stringify({ error: "Email, Business Identity, Lead Name, and VAT Number are required" }),
         {
           status: 400,
           headers: {
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
         email: email.toLowerCase(),
         name,
         companyName,
+        vatNumber,
         password: hashedPassword,
         tradeCode,
         role: "customer",
