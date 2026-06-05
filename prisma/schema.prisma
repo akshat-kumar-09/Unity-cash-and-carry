@@ -184,3 +184,16 @@ model RouteVisit {
   outcome         String   // "pitched" | "follow_up" | "onboarded" | "not_interested"
   notes           String?
 }
+
+model SystemSetting {
+  key   String @id
+  value String
+}
+
+model InviteToken {
+  token     String   @id
+  email     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

@@ -21,6 +21,29 @@ function LoginPageContent() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [checkingGate, setCheckingGate] = useState(true)
+
+  useEffect(() => {
+    async function checkInviteGate() {
+      try {
+        const res = await fetch("/api/settings/invite-gate")
+        const data = await res.json()
+        
+        if (data.inviteOnlyGate) {
+          const hasBypass = document.cookie.split(";").some((c) => c.trim().startsWith("unity_invite_bypass="))
+          if (!hasBypass) {
+            router.replace("/invite-only")
+            return
+          }
+        }
+      } catch (err) {
+        console.error("Error checking invite gate:", err)
+      } finally {
+        setCheckingGate(false)
+      }
+    }
+    checkInviteGate()
+  }, [router])
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -28,7 +51,7 @@ function LoginPageContent() {
     }
   }, [status, router, callbackUrl])
 
-  if (status === "loading") {
+  if (status === "loading" || checkingGate) {
     return (
       <div className="min-h-screen min-h-[100dvh] auth-page-bg flex items-center justify-center">
         <div className="animate-pulse text-white/80 font-mono text-sm uppercase tracking-wider">

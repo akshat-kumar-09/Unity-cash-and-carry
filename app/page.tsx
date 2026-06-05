@@ -17,8 +17,9 @@ import { AdminLeadsView } from "@/components/admin-leads-view"
 import { AdminRoutePlannerView } from "@/components/admin-route-planner-view"
 import { AdminComplianceView } from "@/components/admin-compliance-view"
 import { AdminReportsView } from "@/components/admin-reports-view"
+import { AdminSettingsView } from "@/components/admin-settings-view"
 
-export type AdminSection = "dashboard" | "warehouse" | "leads" | "routes" | "compliance" | "reports"
+export type AdminSection = "dashboard" | "warehouse" | "leads" | "routes" | "compliance" | "reports" | "settings"
 
 function AdminView() {
   const [section, setSection] = useState<AdminSection>("dashboard")
@@ -51,6 +52,11 @@ function AdminView() {
       {section === "reports" && (
         <AdminDashboardView activeSection={section} onSectionChange={setSection}>
           <AdminReportsView />
+        </AdminDashboardView>
+      )}
+      {section === "settings" && (
+        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
+          <AdminSettingsView />
         </AdminDashboardView>
       )}
     </>

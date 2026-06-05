@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import { Resend } from "resend"
+import crypto from "crypto"
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
@@ -90,6 +91,28 @@ export async function PATCH(request: NextRequest) {
 
           if (tempPassword) {
             const portalUrl = process.env.APP_URL || "https://app.unitywholesale.co.uk"
+            let targetLink = `${portalUrl}/login`
+
+            // Check if inviteOnlyGate is active
+            const setting = await prisma.systemSetting.findUnique({
+              where: { key: "inviteOnlyGate" }
+            })
+            const isGateActive = setting ? setting.value === "true" : false
+
+            if (isGateActive) {
+              // Generate token
+              const token = crypto.randomBytes(16).toString("hex")
+              const expiresAt = new Date()
+              expiresAt.setHours(expiresAt.getHours() + 48) // 48 hours
+
+              await prisma.inviteToken.upsert({
+                where: { email: user.email.toLowerCase() },
+                update: { token, expiresAt, used: false, createdAt: new Date() },
+                create: { token, email: user.email.toLowerCase(), expiresAt, used: false }
+              })
+
+              targetLink = `${portalUrl}/invite?token=${token}`
+            }
             
             await resend.emails.send({
               from: "Unity Wholesale <compliance@unitywholesale.co.uk>",
@@ -111,7 +134,7 @@ export async function PATCH(request: NextRequest) {
                   
                   <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
                     <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Your Login Credentials</p>
-                    <p style="margin: 4px 0; font-size: 14px; color: #334155;"><strong>Portal Link:</strong> <a href="${portalUrl}" style="color: #2563eb; text-decoration: none; font-weight: 600;">${portalUrl}</a></p>
+                    <p style="margin: 4px 0; font-size: 14px; color: #334155;"><strong>Portal Link:</strong> <a href="${targetLink}" style="color: #2563eb; text-decoration: none; font-weight: 600;">${targetLink}</a></p>
                     <p style="margin: 4px 0; font-size: 14px; color: #334155;"><strong>Username:</strong> <code style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${user.email}</code></p>
                     <p style="margin: 4px 0; font-size: 14px; color: #334155;"><strong>Temporary Password:</strong> <code style="background-color: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${tempPassword}</code></p>
                   </div>

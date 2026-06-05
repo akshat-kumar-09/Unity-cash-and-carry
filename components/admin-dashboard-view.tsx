@@ -21,6 +21,7 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowRight,
+  Settings,
 } from "lucide-react"
 import { AppScreenHeader } from "@/components/app-screen-header"
 
@@ -31,6 +32,7 @@ export type AdminSection =
   | "routes"
   | "compliance"
   | "reports"
+  | "settings"
 
 type DashboardStats = {
   ordersToday: number
@@ -50,6 +52,7 @@ const NAV_ITEMS: { key: AdminSection; label: string; icon: React.ElementType }[]
   { key: "routes", label: "Routes", icon: MapPin },
   { key: "compliance", label: "Compliance", icon: ShieldCheck },
   { key: "reports", label: "Reports", icon: FileBarChart },
+  { key: "settings", label: "Settings", icon: Settings },
 ]
 
 type Props = {
