@@ -57,7 +57,7 @@ export default function InviteOnlyPage() {
               <div>
                 <p className="text-[12px] font-bold">New trade account requests</p>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  Please apply via our public website or contact your assigned Unity sales representative.
+                  Please apply via <a href="https://unitywholesale.co.uk" className="text-blue-600 hover:underline font-bold" target="_blank" rel="noopener noreferrer">our public website</a> or contact your assigned Unity sales representative.
                 </p>
               </div>
             </div>
