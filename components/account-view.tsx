@@ -24,6 +24,35 @@ export function AccountView() {
     companyName: "",
     retailerLicenseRef: "",
   })
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [showInstallBtn, setShowInstallBtn] = useState(false)
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+      setShowInstallBtn(true)
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setShowInstallBtn(false)
+    }
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+    }
+  }, [])
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    console.log(`User response to the install prompt: ${outcome}`)
+    setDeferredPrompt(null)
+    setShowInstallBtn(false)
+  }
 
   useEffect(() => {
     fetch("/api/admin/compliance?self=true")
@@ -180,6 +209,24 @@ export function AccountView() {
             </button>
           </div>
         </div>
+
+        {/* PWA Install Button */}
+        {showInstallBtn && (
+          <div className="unity-card p-5 flex flex-col items-center gap-3.5 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 text-white border-0 shadow-lg shadow-blue-600/20">
+            <div className="text-center space-y-1.5">
+              <h4 className="text-[13px] font-black uppercase tracking-wider">Download Unity App</h4>
+              <p className="text-[11px] text-white/80 font-semibold leading-relaxed">
+                Install Unity directly to your home screen for quick standalone access, real-time inventory, and offline capabilities.
+              </p>
+            </div>
+            <button
+              onClick={handleInstallApp}
+              className="px-5 py-3 bg-white text-blue-600 hover:bg-slate-50 font-black text-xs uppercase tracking-widest rounded-xl transition-all active:scale-[0.97] w-full shadow-md"
+            >
+              Install Mobile App
+            </button>
+          </div>
+        )}
 
         {/* Sign Out */}
         <button
