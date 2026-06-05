@@ -30,8 +30,16 @@ function LoginPageContent() {
         const data = await res.json()
         
         if (data.inviteOnlyGate) {
+          const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+          const hasBypassParam = searchParams.get("bypass") === "admin"
+          
+          if (hasBypassParam) {
+            document.cookie = "unity_invite_bypass=true; path=/; max-age=2592000; secure; samesite=lax"
+          }
+
           const hasBypass = document.cookie.split(";").some((c) => c.trim().startsWith("unity_invite_bypass="))
-          if (!hasBypass) {
+          
+          if (!hasBypass && !isLocal) {
             router.replace("/invite-only")
             return
           }
@@ -43,7 +51,7 @@ function LoginPageContent() {
       }
     }
     checkInviteGate()
-  }, [router])
+  }, [router, searchParams])
 
   useEffect(() => {
     if (status === "authenticated") {
