@@ -136,12 +136,14 @@ export function AccountView() {
   }
 
   const statusConfig: Record<string, { icon: typeof CheckCircle2; color: string; bg: string; label: string }> = {
+    admin: { icon: Shield, color: "text-blue-600", bg: "bg-blue-50 border-blue-200", label: "Admin Account — Compliance Not Required" },
     approved: { icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200", label: "HMRC Compliant — Approved" },
     pending: { icon: Clock, color: "text-amber-600", bg: "bg-amber-50 border-amber-200", label: "Pending Verification" },
     blocked: { icon: XCircle, color: "text-red-600", bg: "bg-red-50 border-red-200", label: "Account Blocked — Contact Unity" },
   }
 
-  const cs = compliance?.complianceStatus || "pending"
+  const isAdminUser = (session?.user as any)?.role === "admin"
+  const cs = isAdminUser ? "admin" : compliance?.complianceStatus || "pending"
   const statusInfo = statusConfig[cs] || statusConfig.pending
   const StatusIcon = statusInfo.icon
 
@@ -178,7 +180,8 @@ export function AccountView() {
           </div>
         </div>
 
-        {/* Business Compliance Form */}
+        {/* Business Compliance Form — doesn't apply to the platform admin account */}
+        {!isAdminUser && (
         <div className="unity-card overflow-hidden">
           <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
             <Shield className="h-4 w-4 text-blue-600" />
@@ -250,6 +253,7 @@ export function AccountView() {
             </button>
           </div>
         </div>
+        )}
 
         {/* Change Password */}
         <div className="unity-card overflow-hidden">
