@@ -47,7 +47,7 @@ export function OrdersView() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
   // UI States
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null)

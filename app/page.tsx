@@ -6,8 +6,10 @@ import { redirect } from "next/navigation"
 import { AppBottomNav, type AppTab } from "@/components/app-bottom-nav"
 import { ShopView } from "@/components/shop-view"
 import { OrdersView } from "@/components/orders-view"
+import { AdminOrdersView } from "@/components/admin-orders-view"
 import { OffersView } from "@/components/offers-view"
 import { RetailAssistView } from "@/components/retail-assist-view"
+import { AdminCreditControlView } from "@/components/admin-credit-control-view"
 import { AccountView } from "@/components/account-view"
 import { CartProvider } from "@/lib/cart-context"
 import { TradeProvider, useTrade } from "@/lib/trade-context"
@@ -77,9 +79,9 @@ function AppShell() {
           onProductAdded={() => setProductRefreshKey((k) => k + 1)}
         />
       )}
-      {activeTab === "orders" && <OrdersView />}
+      {activeTab === "orders" && (isAdmin ? <AdminOrdersView /> : <OrdersView />)}
       {activeTab === "offers" && <OffersView />}
-      {activeTab === "assist" && <RetailAssistView />}
+      {activeTab === "assist" && (isAdmin ? <AdminCreditControlView /> : <RetailAssistView />)}
       {activeTab === "account" && <AccountView />}
       {activeTab === "admin" && isAdmin && <AdminView />}
 

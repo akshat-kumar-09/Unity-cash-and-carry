@@ -53,6 +53,10 @@ export const createOrderSchema = z.object({
   useWalletCredits: z.boolean().optional(),
 })
 
+export const updateOrderStatusSchema = z.object({
+  status: z.enum(["pending", "confirmed", "dispatched", "delivered", "cancelled"]),
+})
+
 export const createGuestOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1),
   customerName: z.string().min(1),

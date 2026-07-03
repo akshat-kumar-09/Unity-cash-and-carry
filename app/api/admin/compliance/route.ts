@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
         complianceStatus: true,
         complianceNotes: true,
         priceTier: true,
+        walletBalance: true,
         createdAt: true,
         _count: { select: { orders: true } },
       },
