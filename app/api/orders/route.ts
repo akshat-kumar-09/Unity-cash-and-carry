@@ -100,6 +100,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Your account is pending compliance verification. Contact Unity to get approved.' }, { status: 403 })
     }
 
+    // Idempotency guard: a double-tap/double-submit on checkout fires two near-simultaneous
+    // POSTs with identical items before the button's own disabled-state can catch up. If this
+    // exact cart was already submitted by this user in the last 20s, return that order instead
+    // of creating a real duplicate (duplicate = double-shipped stock for a single payment).
+    const signature = (items: { productId: string; quantity: number }[]) =>
+      items.map((i) => `${i.productId}:${i.quantity}`).sort().join(",")
+    const requestSignature = signature(parsed.data.items)
+
+    const recentOrder = await prisma.order.findFirst({
+      where: { userId: user.id, createdAt: { gte: new Date(Date.now() - 20_000) } },
+      orderBy: { createdAt: "desc" },
+      include: { items: true },
+    })
+    if (recentOrder && signature(recentOrder.items.map((i) => ({ productId: i.productId, quantity: i.quantity }))) === requestSignature) {
+      const fullOrder = await prisma.order.findUnique({
+        where: { id: recentOrder.id },
+        include: { items: { include: { product: true } } },
+      })
+      return NextResponse.json(fullOrder, { status: 201 })
+    }
+
     const tier: PriceTier = user.role === "admin" ? "C" : isPriceTier(user.priceTier) ? user.priceTier : "C"
 
     // Calculate totals (tier-resolved wholesale price — server-computed, never trusts client input)

@@ -35,6 +35,7 @@ export function CartFooter() {
   const { data: session } = useSession()
   const [showCheckoutForm, setShowCheckoutForm] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<CheckoutFormData>(initialForm)
   const [formError, setFormError] = useState("")
 
@@ -125,6 +126,7 @@ export function CartFooter() {
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
     setFormError("")
 
     const { customerPhone, shippingAddress, notes } = formData
@@ -133,6 +135,7 @@ export function CartFooter() {
       return
     }
 
+    setIsSubmitting(true)
     try {
       const orderData = {
         items: items.map((item) => ({
@@ -171,6 +174,8 @@ export function CartFooter() {
       console.error("Error placing order:", error)
       setOrderPlaced(false)
       setFormError(error instanceof Error ? error.message : "Failed to place order. Please try again.")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -317,10 +322,10 @@ export function CartFooter() {
               <div className="border-t border-slate-200 bg-white px-4 py-3">
                 <button
                   type="submit"
-                  disabled={orderPlaced}
+                  disabled={orderPlaced || isSubmitting}
                   className="w-full py-3 bg-blue-600 text-white font-bold text-sm uppercase tracking-wider hover:bg-blue-700 transition-colors rounded disabled:opacity-50"
                 >
-                  {orderPlaced ? "Placing..." : "Confirm Order"}
+                  {orderPlaced ? "Placing..." : isSubmitting ? "Confirming..." : "Confirm Order"}
                 </button>
               </div>
             </form>
