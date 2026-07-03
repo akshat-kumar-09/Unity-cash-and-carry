@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react"
+import { useSession } from "next-auth/react"
 import { getEffectiveMaxQtyPerOrder, type Product } from "./products"
 
 export type CartItem = {
@@ -60,16 +61,46 @@ function saveCartToStorage(items: CartItem[]) {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { status } = useSession()
   const [items, setItems] = useState<CartItem[]>([])
   const [isHydrated, setIsHydrated] = useState(false)
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const hasFetchedRef = useRef(false)
+  const [serverCartLoaded, setServerCartLoaded] = useState(false)
 
-  // Load cart from localStorage on mount
+  // Load cart from localStorage on mount — instant for guests, and a fallback until
+  // the server cart (if any) loads for a logged-in user just below.
   useEffect(() => {
     const savedItems = loadCartFromStorage()
     setItems(savedItems)
     setIsHydrated(true)
   }, [])
+
+  // Once logged in, the server's saved cart is authoritative — this is what survives
+  // logout/login and device changes, unlike localStorage which is per-browser only.
+  // serverCartLoaded only flips true once the response actually arrives — the PUT-sync
+  // effect below is gated on it, so it can't fire with stale local data and clobber the
+  // server's real cart before this load has had a chance to apply it.
+  useEffect(() => {
+    if (status !== "authenticated" || hasFetchedRef.current) return
+    hasFetchedRef.current = true
+    fetch("/api/cart")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.items) setItems(data.items)
+      })
+      .catch(() => {})
+      .finally(() => setServerCartLoaded(true))
+  }, [status])
+
+  // Reset on logout so a different account logging in on the same browser re-fetches
+  // its own cart instead of reusing (or overwriting) the previous user's.
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      hasFetchedRef.current = false
+      setServerCartLoaded(false)
+    }
+  }, [status])
 
   // Save cart to localStorage whenever items change
   useEffect(() => {
@@ -77,6 +108,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
       saveCartToStorage(items)
     }
   }, [items, isHydrated])
+
+  // Also persist to the DB for logged-in users so it survives logout/login.
+  useEffect(() => {
+    if (!isHydrated || status !== "authenticated" || !serverCartLoaded) return
+    fetch("/api/cart", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    }).catch(() => {})
+  }, [items, isHydrated, status, serverCartLoaded])
 
   const addItem = useCallback((product: Product) => {
     setItems((prev) => {

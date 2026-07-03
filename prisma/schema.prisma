@@ -28,6 +28,8 @@ model User {
   complianceStatus       String    @default("pending")  // "pending" | "approved" | "blocked"
   complianceNotes        String?
   assignedRepId          String?
+  /// Saved cart (array of {productId, quantity}) — survives logout/login and device changes.
+  cartData               Json?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   orders        Order[]
