@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import { PRODUCT_CATEGORY_SLUGS, type ProductCategorySlug } from '@/lib/product-categories'
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+})
+
 const isProductCategory = (c: string): c is ProductCategorySlug =>
   (PRODUCT_CATEGORY_SLUGS as readonly string[]).includes(c)
 

@@ -2,9 +2,10 @@
 
 import { useSession, signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
-import { LogOut, Shield, Building2, FileText, CheckCircle2, Clock, XCircle } from "lucide-react"
+import { LogOut, Shield, Building2, FileText, CheckCircle2, Clock, XCircle, KeyRound } from "lucide-react"
 import { UnityLogo } from "@/components/unity-logo"
 import { AppScreenHeader } from "@/components/app-screen-header"
+import { toast } from "sonner"
 
 type ComplianceData = {
   vatNumber: string | null
@@ -26,6 +27,9 @@ export function AccountView() {
   })
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [showInstallBtn, setShowInstallBtn] = useState(false)
+  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" })
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwError, setPwError] = useState("")
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -84,6 +88,43 @@ export function AccountView() {
       )
     } catch {}
     setSaving(false)
+  }
+
+  const handleChangePassword = async () => {
+    setPwError("")
+    if (!pwForm.currentPassword || !pwForm.newPassword) {
+      setPwError("Please fill in both password fields.")
+      return
+    }
+    if (pwForm.newPassword.length < 8) {
+      setPwError("New password must be at least 8 characters.")
+      return
+    }
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      setPwError("New password and confirmation don't match.")
+      return
+    }
+
+    setPwSaving(true)
+    try {
+      const res = await fetch("/api/account/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: pwForm.currentPassword,
+          newPassword: pwForm.newPassword,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to change password")
+
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+      toast.success("Password changed successfully")
+    } catch (e) {
+      setPwError(e instanceof Error ? e.message : "Failed to change password")
+    } finally {
+      setPwSaving(false)
+    }
   }
 
   if (status === "loading") {
@@ -206,6 +247,64 @@ export function AccountView() {
               className="w-full py-3 bg-blue-600 text-white font-bold text-sm uppercase tracking-wider rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
             >
               {saving ? "Saving…" : "Save Compliance Details"}
+            </button>
+          </div>
+        </div>
+
+        {/* Change Password */}
+        <div className="unity-card overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
+            <KeyRound className="h-4 w-4 text-blue-600" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Change Password
+            </span>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Current Password
+              </label>
+              <input
+                type="password"
+                value={pwForm.currentPassword}
+                onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
+                placeholder="Your current password"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                New Password
+              </label>
+              <input
+                type="password"
+                value={pwForm.newPassword}
+                onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
+                placeholder="At least 8 characters"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                value={pwForm.confirmPassword}
+                onChange={(e) => setPwForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                placeholder="Repeat new password"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {pwError && (
+              <p className="text-[12px] font-semibold text-red-600">{pwError}</p>
+            )}
+            <button
+              onClick={handleChangePassword}
+              disabled={pwSaving}
+              className="w-full py-3 bg-blue-600 text-white font-bold text-sm uppercase tracking-wider rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
+            >
+              {pwSaving ? "Updating…" : "Update Password"}
             </button>
           </div>
         </div>

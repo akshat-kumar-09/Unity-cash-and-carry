@@ -17,6 +17,7 @@ import {
   Link as LinkIcon,
   KeyRound,
   Copy,
+  Mail,
 } from "lucide-react"
 import { AppScreenHeader } from "@/components/app-screen-header"
 import { toast } from "sonner"
@@ -112,19 +113,23 @@ export function AdminComplianceView() {
     }
   }
 
+  const generateInviteLink = async (trader: Trader): Promise<string> => {
+    const res = await fetch("/api/admin/settings/invite-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: trader.email }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || "Failed to generate invite link")
+
+    const portalUrl = typeof window !== "undefined" ? window.location.origin : ""
+    return `${portalUrl}/invite?token=${data.token}`
+  }
+
   const handleCopyInviteLink = async (trader: Trader) => {
     setLinkingId(trader.id)
     try {
-      const res = await fetch("/api/admin/settings/invite-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trader.email }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || "Failed to generate invite link")
-
-      const portalUrl = typeof window !== "undefined" ? window.location.origin : ""
-      const link = `${portalUrl}/invite?token=${data.token}`
+      const link = await generateInviteLink(trader)
       const tempPassword = extractTempPassword(trader.complianceNotes)
 
       const clipboardText = tempPassword
@@ -139,6 +144,37 @@ export function AdminComplianceView() {
       )
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to copy invite link")
+    } finally {
+      setLinkingId(null)
+    }
+  }
+
+  const handleEmailInviteLink = async (trader: Trader) => {
+    setLinkingId(trader.id)
+    try {
+      const link = await generateInviteLink(trader)
+      const tempPassword = extractTempPassword(trader.complianceNotes)
+
+      const subject = "Your Unity Wholesale Trade Account is Approved"
+      const body = [
+        `Hi ${trader.name || "there"},`,
+        "",
+        "Your Unity Wholesale trade account has been approved. Use the one-time link below to sign in — it can only be used once, so open it directly rather than forwarding it.",
+        "",
+        `Login link: ${link}`,
+        `Email: ${trader.email}`,
+        tempPassword ? `Temporary password: ${tempPassword}` : "",
+        "",
+        "You can change your password any time from Account > Settings once logged in.",
+        "",
+        "Unity Cash & Carry",
+      ].filter(Boolean).join("\n")
+
+      const mailto = `mailto:${encodeURIComponent(trader.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+      window.location.href = mailto
+      toast.success(`Opening your email app to send ${trader.email}...`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to prepare invite email")
     } finally {
       setLinkingId(null)
     }
@@ -390,6 +426,18 @@ export function AdminComplianceView() {
                             <LinkIcon className="h-3.5 w-3.5" />
                           )}
                           Copy invite link
+                        </button>
+                        <button
+                          onClick={() => handleEmailInviteLink(trader)}
+                          disabled={linkingId === trader.id}
+                          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] uppercase tracking-wider py-2 px-3 rounded-lg transition-all active:scale-[0.97] disabled:opacity-50"
+                        >
+                          {linkingId === trader.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Mail className="h-3.5 w-3.5" />
+                          )}
+                          Send email
                         </button>
                       </div>
 
