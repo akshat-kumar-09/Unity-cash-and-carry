@@ -118,7 +118,7 @@ export const PRODUCT_LINES_BY_BRAND: Record<string, string[]> = {
   "Lost Mary": ["BM600", "BM6000", "MaryLiq Salts"],
   SKE: ["Bar 15K", "Crystal Bar", "4in1", "Salts"],
   IVG: ["2400", "Pro", "Smart Max", "Smart Max Refills", "IVG Salts", "2400 Pods"],
-  Higo: ["Pulse Kit", "Pulse Pods", "BB 4000 Kit", "BB 4000 Pods", "Alfa Pro Kit", "Higo Salts"],
+  Higo: ["BB 4000 Kit", "BB 4000 Pods", "Alfa Pro Kit", "Pulse Kit", "Pulse Pods", "Higo Salts"],
 }
 
 /** API sort priority (lower = first) */

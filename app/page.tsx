@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { redirect } from "next/navigation"
 import { AppBottomNav, type AppTab } from "@/components/app-bottom-nav"
@@ -67,8 +67,29 @@ function AdminView() {
 
 function AppShell() {
   const { isAdmin } = useTrade()
-  const [activeTab, setActiveTab] = useState<AppTab>("shop")
+  const [activeTab, setActiveTabState] = useState<AppTab>("shop")
   const [productRefreshKey, setProductRefreshKey] = useState(0)
+
+  // The app is one URL with all "tabs" swapped via local state, so switching tabs never
+  // left anything in browser history — the phone/browser back button had nothing of the
+  // app's own to step through and jumped straight past it. Push a history entry per tab
+  // so back steps back through tabs visited instead of leaving the app immediately.
+  useEffect(() => {
+    window.history.replaceState({ tab: "shop" }, "", "#shop")
+    const onPopState = (e: PopStateEvent) => {
+      const tab = (e.state?.tab as AppTab) || "shop"
+      setActiveTabState(tab)
+    }
+    window.addEventListener("popstate", onPopState)
+    return () => window.removeEventListener("popstate", onPopState)
+  }, [])
+
+  const setActiveTab = (tab: AppTab) => {
+    if (tab !== activeTab) {
+      window.history.pushState({ tab }, "", `#${tab}`)
+    }
+    setActiveTabState(tab)
+  }
 
   return (
     <div className="min-h-[100dvh] flex flex-col md:max-w-4xl md:mx-auto md:bg-slate-100">
