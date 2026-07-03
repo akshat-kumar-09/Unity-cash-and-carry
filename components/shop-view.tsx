@@ -24,12 +24,16 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null)
   const [selectedBrand, setSelectedBrand] = useState<BrandFilter | null>(null)
 
+  const isBrandOnlyCategory = (slug: ProductCategorySlug | null) =>
+    !!slug && SHOP_CATEGORIES.find((c) => c.id === slug)?.drilldown === "brand_only"
+
   const showProductGrid = useMemo(() => {
     if (!selectedCategorySlug) return false
     if (SIMPLE_BROWSE_SLUGS.includes(selectedCategorySlug)) return true
     if (selectedCategorySlug === "vapes" || selectedCategorySlug === "e_liquids") {
       return !!(selectedSubcategory && selectedBrand)
     }
+    if (isBrandOnlyCategory(selectedCategorySlug)) return !!selectedBrand
     return false
   }, [selectedCategorySlug, selectedSubcategory, selectedBrand])
 
@@ -47,6 +51,9 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
     ) {
       return "Back to brands"
     }
+    if (selectedCategorySlug && isBrandOnlyCategory(selectedCategorySlug) && selectedBrand) {
+      return "Back to brands"
+    }
     return "Back to categories"
   }, [selectedCategorySlug, selectedSubcategory, selectedBrand])
 
@@ -58,6 +65,8 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
       selectedBrand
     ) {
       setSelectedSubcategory(null)
+      setSelectedBrand(null)
+    } else if (selectedCategorySlug && isBrandOnlyCategory(selectedCategorySlug) && selectedBrand) {
       setSelectedBrand(null)
     } else {
       setSelectedCategorySlug(null)
@@ -150,12 +159,20 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
                   </p>
                   <p className="text-base font-bold text-slate-900">All lines</p>
                 </div>
+              ) : selectedSubcategory && selectedBrand ? (
+                <div className="unity-card mb-4 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    {categoryLabel} · {selectedSubcategory}
+                  </p>
+                  <p className="text-base font-bold text-slate-900">{selectedBrand}</p>
+                </div>
               ) : (
-                selectedSubcategory &&
+                selectedCategorySlug &&
+                isBrandOnlyCategory(selectedCategorySlug) &&
                 selectedBrand && (
                   <div className="unity-card mb-4 px-4 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      {categoryLabel} · {selectedSubcategory}
+                      {categoryLabel}
                     </p>
                     <p className="text-base font-bold text-slate-900">{selectedBrand}</p>
                   </div>

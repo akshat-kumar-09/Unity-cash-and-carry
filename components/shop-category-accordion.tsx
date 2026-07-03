@@ -13,6 +13,7 @@ import {
   VAPING_SUBCATEGORIES,
   E_LIQUID_SUBCATEGORIES,
   VAPING_BRANDS,
+  POUCH_BRANDS,
   brandInitials,
   type ProductCategorySlug,
 } from "@/lib/product-categories"
@@ -172,6 +173,52 @@ function VapeStyleCategoryCard({
   )
 }
 
+function BrandOnlyCategoryCard({
+  def,
+  brands,
+  onPickBrand,
+}: {
+  def: (typeof SHOP_CATEGORIES)[number]
+  brands: readonly BrandFilter[]
+  onPickBrand: (brand: BrandFilter) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-dashed border-blue-300/80 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner">
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="unity-tap flex w-full items-center justify-between px-3.5 py-3 text-left"
+        aria-expanded={expanded}
+      >
+        <div>
+          <span className="text-[13px] font-bold uppercase tracking-wider text-blue-600">
+            {def.label}
+          </span>
+          <p className="mt-0.5 text-[10px] font-medium leading-snug text-blue-600/75">
+            {def.keywords}
+          </p>
+        </div>
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 shrink-0 text-blue-500" />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-blue-500" />
+        )}
+      </button>
+      {expanded && (
+        <div className="border-t border-dashed border-blue-200/80 px-2.5 pb-2.5 pt-2">
+          <div className="overflow-hidden rounded-lg border border-blue-100/80 bg-white/90">
+            {brands.map((brand) => (
+              <BrandRow key={brand} brand={brand} onSelect={() => onPickBrand(brand)} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SimpleCategoryTile({
   label,
   keywords,
@@ -273,6 +320,23 @@ export function ShopCategoryAccordion({ onNavigate }: ShopCategoryAccordionProps
                 onNavigate({
                   categorySlug: "e_liquids",
                   subcategory: sub,
+                  brand,
+                })
+              }
+            />
+          )
+        }
+
+        if (cat.drilldown === "brand_only") {
+          return (
+            <BrandOnlyCategoryCard
+              key={cat.id}
+              def={cat}
+              brands={POUCH_BRANDS}
+              onPickBrand={(brand) =>
+                onNavigate({
+                  categorySlug: cat.id,
+                  subcategory: null,
                   brand,
                 })
               }

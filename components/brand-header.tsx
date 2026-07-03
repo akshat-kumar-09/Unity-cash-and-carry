@@ -10,6 +10,10 @@ const brandTagline: Record<BrandFilter, string> = {
   IVG: "High-puff disposables",
   SKE: "Crystal range",
   "Lost Mary": "Popular disposables",
+  Killa: "Nicotine pouches",
+  "Nordic Spirit": "Nicotine pouches",
+  Pablo: "Nicotine pouches",
+  Velo: "Nicotine pouches",
   Accessories: "Papers, lighters, filters & more",
 }
 
@@ -21,6 +25,10 @@ export const brandBannerSlug: Record<BrandFilter, string> = {
   IVG: "ivg",
   SKE: "ske",
   "Lost Mary": "lost-mary",
+  Killa: "killa",
+  "Nordic Spirit": "nordic-spirit",
+  Pablo: "pablo",
+  Velo: "velo",
   Accessories: "accessories",
 }
 
@@ -32,6 +40,10 @@ const brandGradient: Record<BrandFilter, string> = {
   IVG: "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)",
   SKE: "linear-gradient(135deg, #1e40af 0%, #2563eb 100%)",
   "Lost Mary": "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+  Killa: "linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)",
+  "Nordic Spirit": "linear-gradient(135deg, #1e3a8a 0%, #38bdf8 100%)",
+  Pablo: "linear-gradient(135deg, #78350f 0%, #d97706 100%)",
+  Velo: "linear-gradient(135deg, #1e293b 0%, #64748b 100%)",
   Accessories: "linear-gradient(135deg, #1e3a8a 0%, #2dd4bf 90%)",
 }
 

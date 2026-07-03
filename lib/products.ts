@@ -8,6 +8,10 @@ export type Brand =
   | "IVG"
   | "Higo"
   | "Lost Mary"
+  | "Killa"
+  | "Nordic Spirit"
+  | "Pablo"
+  | "Velo"
   | "Rizla"
   | "RAW"
   | "Swan"
@@ -71,6 +75,10 @@ export const brandFilters = [
   "IVG",
   "SKE",
   "Lost Mary",
+  "Killa",
+  "Nordic Spirit",
+  "Pablo",
+  "Velo",
   "Accessories",
 ] as const
 export type BrandFilter = (typeof brandFilters)[number]

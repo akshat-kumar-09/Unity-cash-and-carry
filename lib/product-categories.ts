@@ -40,8 +40,11 @@ export const SIMPLE_BROWSE_SLUGS: readonly ProductCategorySlug[] = [
   "filters",
   "lighters_fire",
   "other",
-  "nicotine_pouches",
 ]
+
+/** Nicotine pouch brands — flat brand picker (no subcategory ladder like vapes). */
+export const POUCH_BRANDS = ["Killa", "Nordic Spirit", "Pablo", "Velo"] as const
+export type PouchBrand = (typeof POUCH_BRANDS)[number]
 
 export type ShopCategoryStatus = "active" | "coming_soon"
 
@@ -52,14 +55,14 @@ export type ShopCategoryDef = {
   keywords: string
   status: ShopCategoryStatus
   /** Uses subcategory → brand drill-down in shop */
-  drilldown: "vape_style" | "none"
+  drilldown: "vape_style" | "brand_only" | "none"
 }
 
 /** Full shop IA: order = display order (papers / filters / lighters / other last) */
 export const SHOP_CATEGORIES: ShopCategoryDef[] = [
   { id: "vapes", label: "Vaping", keywords: "Disposables • pods • kits • hardware", status: "active", drilldown: "vape_style" },
   { id: "e_liquids", label: "E-liquids", keywords: "Salts • freebase • shortfills • bar salts", status: "active", drilldown: "vape_style" },
-  { id: "nicotine_pouches", label: "Nicotine pouches", keywords: "Snus • white pouches • nic pods", status: "active", drilldown: "none" },
+  { id: "nicotine_pouches", label: "Nicotine pouches", keywords: "Snus • white pouches • nic pods", status: "active", drilldown: "brand_only" },
   { id: "cbd_hemp", label: "CBD & hemp", keywords: "Oils • edibles • legal UK", status: "coming_soon", drilldown: "none" },
   { id: "limited_editions", label: "Limited editions", keywords: "Drops • exclusives • collabs", status: "coming_soon", drilldown: "none" },
   { id: "coils", label: "Coils & heating", keywords: "Mesh • stock coils • pods", status: "coming_soon", drilldown: "none" },
