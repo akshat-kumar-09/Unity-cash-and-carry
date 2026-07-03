@@ -40,13 +40,13 @@ export function CartFooter() {
   const [formData, setFormData] = useState<CheckoutFormData>(initialForm)
   const [formError, setFormError] = useState("")
 
-  // Back button: closes the checkout form back to the cart list first, then closes
-  // the cart sheet entirely — instead of leaving the app (no history entry otherwise).
-  useBackHandler(showCheckoutForm, () => {
-    setShowCheckoutForm(false)
-    setFormError("")
-  })
-  useBackHandler(isCartOpen && !showCheckoutForm, closeCart)
+  // Back button: closes the cart/checkout sheet instead of leaving the app (no history
+  // entry otherwise). Deliberately ONE combined boolean, not two nested ones keyed off
+  // showCheckoutForm — two independent hooks here caused a real bug: opening the
+  // checkout form flips a "isCartOpen && !showCheckoutForm" condition to false as a
+  // side effect, which the hook can't tell apart from an actual close, so it fired a
+  // spurious history.back() that closed the form the instant it opened.
+  useBackHandler(isCartOpen, closeCart)
 
   // Wallet and Promo states
   const [walletBalance, setWalletBalance] = useState(0)
