@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
         retailerLicenseRef: true,
         complianceStatus: true,
         complianceNotes: true,
+        priceTier: true,
         createdAt: true,
         _count: { select: { orders: true } },
       },
@@ -53,7 +54,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { userId, complianceStatus, complianceNotes } = body
+    const { userId, complianceStatus, complianceNotes, priceTier } = body
 
     if (!userId || !complianceStatus) {
       return NextResponse.json({ error: "userId and complianceStatus are required" }, { status: 400 })
@@ -67,8 +68,13 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
+    if (priceTier !== undefined && !["A", "B", "C"].includes(priceTier)) {
+      return NextResponse.json({ error: "priceTier must be one of: A, B, C" }, { status: 400 })
+    }
+
     const data: any = { complianceStatus }
     if (complianceNotes !== undefined) data.complianceNotes = complianceNotes
+    if (priceTier !== undefined) data.priceTier = priceTier
 
     const user = await prisma.user.update({
       where: { id: userId },
@@ -79,6 +85,7 @@ export async function PATCH(request: NextRequest) {
         email: true,
         complianceStatus: true,
         complianceNotes: true,
+        priceTier: true,
       },
     })
 

@@ -10,9 +10,6 @@ const brandTagline: Record<BrandFilter, string> = {
   IVG: "High-puff disposables",
   SKE: "Crystal range",
   "Lost Mary": "Popular disposables",
-  Hayati: "Pro range",
-  "Pyne Pods": "Pod systems",
-  Dojo: "Dojo range",
   Accessories: "Papers, lighters, filters & more",
 }
 
@@ -24,9 +21,6 @@ export const brandBannerSlug: Record<BrandFilter, string> = {
   IVG: "ivg",
   SKE: "ske",
   "Lost Mary": "lost-mary",
-  Hayati: "hayati",
-  "Pyne Pods": "pyne-pods",
-  Dojo: "dojo",
   Accessories: "accessories",
 }
 
@@ -38,9 +32,6 @@ const brandGradient: Record<BrandFilter, string> = {
   IVG: "linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)",
   SKE: "linear-gradient(135deg, #1e40af 0%, #2563eb 100%)",
   "Lost Mary": "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
-  Hayati: "linear-gradient(135deg, #1d4ed8 0%, #22c55e 80%)",
-  "Pyne Pods": "linear-gradient(135deg, #2563eb 0%, #34d399 100%)",
-  Dojo: "linear-gradient(135deg, #1e40af 0%, #2563eb 100%)",
   Accessories: "linear-gradient(135deg, #1e3a8a 0%, #2dd4bf 90%)",
 }
 

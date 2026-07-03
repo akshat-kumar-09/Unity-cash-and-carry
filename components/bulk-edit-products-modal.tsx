@@ -36,6 +36,10 @@ export function BulkEditProductsModal({
   const [description, setDescription] = useState("")
   const [casePriceStr, setCasePriceStr] = useState("")
   const [unitPriceStr, setUnitPriceStr] = useState("")
+  const [casePriceAStr, setCasePriceAStr] = useState("")
+  const [unitPriceAStr, setUnitPriceAStr] = useState("")
+  const [casePriceBStr, setCasePriceBStr] = useState("")
+  const [unitPriceBStr, setUnitPriceBStr] = useState("")
   const [unitsPerPackStr, setUnitsPerPackStr] = useState("")
   const [packLabel, setPackLabel] = useState("")
   const [maxQtyStr, setMaxQtyStr] = useState("")
@@ -47,6 +51,10 @@ export function BulkEditProductsModal({
       setDescription("")
       setCasePriceStr("")
       setUnitPriceStr("")
+      setCasePriceAStr("")
+      setUnitPriceAStr("")
+      setCasePriceBStr("")
+      setUnitPriceBStr("")
       setUnitsPerPackStr("")
       setPackLabel("")
       setMaxQtyStr("")
@@ -76,6 +84,10 @@ export function BulkEditProductsModal({
 
     const casePrice = parseOptionalPositive(casePriceStr)
     const unitPrice = parseOptionalPositive(unitPriceStr)
+    const casePriceA = parseOptionalPositive(casePriceAStr)
+    const unitPriceA = parseOptionalPositive(unitPriceAStr)
+    const casePriceB = parseOptionalPositive(casePriceBStr)
+    const unitPriceB = parseOptionalPositive(unitPriceBStr)
     const unitsPerPack = parseOptionalInt(unitsPerPackStr)
     const maxQty = parseOptionalInt(maxQtyStr)
     const packTrim = packLabel.trim()
@@ -86,6 +98,22 @@ export function BulkEditProductsModal({
     }
     if (unitPrice !== undefined && Number.isNaN(unitPrice)) {
       setError("Unit price must be a positive number or left blank.")
+      return
+    }
+    if (casePriceA !== undefined && Number.isNaN(casePriceA)) {
+      setError("Tier A case price must be a positive number or left blank.")
+      return
+    }
+    if (unitPriceA !== undefined && Number.isNaN(unitPriceA)) {
+      setError("Tier A unit price must be a positive number or left blank.")
+      return
+    }
+    if (casePriceB !== undefined && Number.isNaN(casePriceB)) {
+      setError("Tier B case price must be a positive number or left blank.")
+      return
+    }
+    if (unitPriceB !== undefined && Number.isNaN(unitPriceB)) {
+      setError("Tier B unit price must be a positive number or left blank.")
       return
     }
     if (unitsPerPack !== undefined && Number.isNaN(unitsPerPack)) {
@@ -112,6 +140,10 @@ export function BulkEditProductsModal({
       description?: string
       casePrice?: number
       unitPrice?: number
+      casePriceA?: number
+      unitPriceA?: number
+      casePriceB?: number
+      unitPriceB?: number
       unitsPerPack?: number
       packLabel?: string
       maxQtyPerOrder?: number
@@ -119,6 +151,10 @@ export function BulkEditProductsModal({
     if (descTrim.length >= 20) payload.description = descTrim
     if (casePrice !== undefined) payload.casePrice = casePrice
     if (unitPrice !== undefined) payload.unitPrice = unitPrice
+    if (casePriceA !== undefined) payload.casePriceA = casePriceA
+    if (unitPriceA !== undefined) payload.unitPriceA = unitPriceA
+    if (casePriceB !== undefined) payload.casePriceB = casePriceB
+    if (unitPriceB !== undefined) payload.unitPriceB = unitPriceB
     if (unitsPerPack !== undefined) payload.unitsPerPack = unitsPerPack
     if (packTrim !== "") payload.packLabel = packTrim
     if (maxQty !== undefined) payload.maxQtyPerOrder = maxQty
@@ -233,6 +269,40 @@ export function BulkEditProductsModal({
                   autoComplete="off"
                 />
               </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3 space-y-2">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                Tier pricing (optional)
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase text-slate-600">
+                    Tier A case (£)
+                  </label>
+                  <input type="text" inputMode="decimal" value={casePriceAStr} onChange={(e) => setCasePriceAStr(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm" placeholder="Leave blank" autoComplete="off" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase text-slate-600">
+                    Tier A unit (£)
+                  </label>
+                  <input type="text" inputMode="decimal" value={unitPriceAStr} onChange={(e) => setUnitPriceAStr(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm" placeholder="Leave blank" autoComplete="off" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase text-slate-600">
+                    Tier B case (£)
+                  </label>
+                  <input type="text" inputMode="decimal" value={casePriceBStr} onChange={(e) => setCasePriceBStr(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm" placeholder="Leave blank" autoComplete="off" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase text-slate-600">
+                    Tier B unit (£)
+                  </label>
+                  <input type="text" inputMode="decimal" value={unitPriceBStr} onChange={(e) => setUnitPriceBStr(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm" placeholder="Leave blank" autoComplete="off" />
+                </div>
+              </div>
+              <p className="text-[9px] text-slate-400 leading-snug">
+                Applied to all selected products. Leave a field blank to leave it unchanged.
+              </p>
             </div>
             <div>
               <label className="mb-1 block text-[10px] font-bold uppercase text-slate-600">

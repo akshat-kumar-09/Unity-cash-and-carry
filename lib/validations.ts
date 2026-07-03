@@ -19,6 +19,11 @@ const productFields = {
   unitsPerPack: z.number().int().positive(),
   unitPrice: z.number().positive(),
   casePrice: z.number().positive(),
+  /** Tier A/B wholesale overrides — omitted/null falls back to unitPrice/casePrice (Tier C). */
+  unitPriceA: z.number().positive().optional().nullable(),
+  casePriceA: z.number().positive().optional().nullable(),
+  unitPriceB: z.number().positive().optional().nullable(),
+  casePriceB: z.number().positive().optional().nullable(),
   maxQtyPerOrder: z.number().int().min(1).max(99999).default(100),
   badge: z.string().optional(),
   imageUrl: z.string().max(2000).optional().nullable(),
@@ -86,6 +91,11 @@ export const updateProductSchema = z
     imageUrl: z.string().max(2000).optional().nullable(),
     unitPrice: z.number().positive().optional(),
     casePrice: z.number().positive().optional(),
+    /** Tier A/B wholesale overrides — null clears the override back to unitPrice/casePrice. */
+    unitPriceA: z.number().positive().optional().nullable(),
+    casePriceA: z.number().positive().optional().nullable(),
+    unitPriceB: z.number().positive().optional().nullable(),
+    casePriceB: z.number().positive().optional().nullable(),
     /** Units per box/case (wholesale pack size). */
     unitsPerPack: z.number().int().positive().optional(),
     /** Customer-facing pack line on cards (e.g. Box of 10, Outer of 5). */
@@ -103,6 +113,10 @@ export const updateProductSchema = z
       d.imageUrl !== undefined ||
       d.unitPrice !== undefined ||
       d.casePrice !== undefined ||
+      d.unitPriceA !== undefined ||
+      d.casePriceA !== undefined ||
+      d.unitPriceB !== undefined ||
+      d.casePriceB !== undefined ||
       d.unitsPerPack !== undefined ||
       d.packLabel !== undefined ||
       d.maxQtyPerOrder !== undefined ||
@@ -123,6 +137,10 @@ export const bulkUpdateProductsSchema = z
       .optional(),
     casePrice: z.number().positive().optional(),
     unitPrice: z.number().positive().optional(),
+    unitPriceA: z.number().positive().optional().nullable(),
+    casePriceA: z.number().positive().optional().nullable(),
+    unitPriceB: z.number().positive().optional().nullable(),
+    casePriceB: z.number().positive().optional().nullable(),
     unitsPerPack: z.number().int().positive().optional(),
     packLabel: z.string().min(1).max(120).optional(),
     maxQtyPerOrder: z.number().int().min(1).max(99999).optional(),
@@ -135,6 +153,10 @@ export const bulkUpdateProductsSchema = z
       d.description !== undefined ||
       d.casePrice !== undefined ||
       d.unitPrice !== undefined ||
+      d.unitPriceA !== undefined ||
+      d.casePriceA !== undefined ||
+      d.unitPriceB !== undefined ||
+      d.casePriceB !== undefined ||
       d.unitsPerPack !== undefined ||
       d.packLabel !== undefined ||
       d.maxQtyPerOrder !== undefined ||

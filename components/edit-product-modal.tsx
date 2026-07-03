@@ -22,6 +22,10 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
   const [imageUrl, setImageUrl] = useState("")
   const [casePriceStr, setCasePriceStr] = useState("")
   const [unitPriceStr, setUnitPriceStr] = useState("")
+  const [casePriceAStr, setCasePriceAStr] = useState("")
+  const [unitPriceAStr, setUnitPriceAStr] = useState("")
+  const [casePriceBStr, setCasePriceBStr] = useState("")
+  const [unitPriceBStr, setUnitPriceBStr] = useState("")
   const [unitsPerPackStr, setUnitsPerPackStr] = useState("")
   const [packLabel, setPackLabel] = useState("")
   const [maxQtyPerOrderStr, setMaxQtyPerOrderStr] = useState("")
@@ -38,6 +42,10 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       setImageUrl(product.imageUrl ?? "")
       setCasePriceStr(String(roundMoney(product.casePrice)))
       setUnitPriceStr(String(roundMoney(product.unitPrice)))
+      setCasePriceAStr(product.casePriceA != null ? String(roundMoney(product.casePriceA)) : "")
+      setUnitPriceAStr(product.unitPriceA != null ? String(roundMoney(product.unitPriceA)) : "")
+      setCasePriceBStr(product.casePriceB != null ? String(roundMoney(product.casePriceB)) : "")
+      setUnitPriceBStr(product.unitPriceB != null ? String(roundMoney(product.unitPriceB)) : "")
       setUnitsPerPackStr(String(product.unitsPerPack))
       setPackLabel(product.packLabel ?? "")
       setMaxQtyPerOrderStr(String(getEffectiveMaxQtyPerOrder(product)))
@@ -74,6 +82,10 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
         imageUrl?: string | null
         casePrice?: number
         unitPrice?: number
+        casePriceA?: number | null
+        unitPriceA?: number | null
+        casePriceB?: number | null
+        unitPriceB?: number | null
         unitsPerPack?: number
         packLabel?: string
         maxQtyPerOrder?: number
@@ -116,6 +128,28 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       const unitRounded = roundMoney(unitP)
       if (caseRounded !== roundMoney(product.casePrice)) body.casePrice = caseRounded
       if (unitRounded !== roundMoney(product.unitPrice)) body.unitPrice = unitRounded
+
+      const parseOptionalTier = (str: string, label: string): number | null => {
+        const trimmed = str.trim()
+        if (trimmed === "") return null
+        const n = parseFloat(trimmed.replace(",", "."))
+        if (Number.isNaN(n) || n <= 0) {
+          throw new Error(`${label} must be a positive number, or blank to clear it.`)
+        }
+        return roundMoney(n)
+      }
+
+      const caseA = parseOptionalTier(casePriceAStr, "Tier A case price")
+      if (caseA !== (product.casePriceA ?? null)) body.casePriceA = caseA
+
+      const unitA = parseOptionalTier(unitPriceAStr, "Tier A unit price")
+      if (unitA !== (product.unitPriceA ?? null)) body.unitPriceA = unitA
+
+      const caseB = parseOptionalTier(casePriceBStr, "Tier B case price")
+      if (caseB !== (product.casePriceB ?? null)) body.casePriceB = caseB
+
+      const unitB = parseOptionalTier(unitPriceBStr, "Tier B unit price")
+      if (unitB !== (product.unitPriceB ?? null)) body.unitPriceB = unitB
 
       const upp = parseInt(unitsPerPackStr.replace(/\D/g, ""), 10)
       if (Number.isNaN(upp) || upp < 1) {
@@ -262,8 +296,44 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
             </div>
           </div>
           <p className="text-[10px] text-slate-500 leading-snug">
-            Cart totals use case price + VAT. Prices are stored ex. VAT.
+            Cart totals use case price + VAT. Prices are stored ex. VAT. This is the Tier C (standard) price.
           </p>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3 space-y-2">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              Tier pricing overrides (optional)
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                  Tier A case (£)
+                </label>
+                <input type="text" inputMode="decimal" value={casePriceAStr} onChange={(e) => setCasePriceAStr(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono" placeholder="Leave blank" autoComplete="off" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                  Tier A unit (£)
+                </label>
+                <input type="text" inputMode="decimal" value={unitPriceAStr} onChange={(e) => setUnitPriceAStr(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono" placeholder="Leave blank" autoComplete="off" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                  Tier B case (£)
+                </label>
+                <input type="text" inputMode="decimal" value={casePriceBStr} onChange={(e) => setCasePriceBStr(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono" placeholder="Leave blank" autoComplete="off" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+                  Tier B unit (£)
+                </label>
+                <input type="text" inputMode="decimal" value={unitPriceBStr} onChange={(e) => setUnitPriceBStr(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono" placeholder="Leave blank" autoComplete="off" />
+              </div>
+            </div>
+            <p className="text-[9px] text-slate-400 leading-snug">
+              Tier A = most valued retailers, Tier B = valued retailers. Blank = they see the standard Tier C price above.
+            </p>
+          </div>
+
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
               Units per box (case pack)

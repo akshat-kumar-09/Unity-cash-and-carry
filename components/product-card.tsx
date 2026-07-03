@@ -84,7 +84,7 @@ export function ProductCard({
       style={animateIn ? { animationDelay: `${Math.min(index * 35, 350)}ms` } : undefined}
     >
       {/* Product image — img tag so placeholders load; fallback to local if external fails */}
-      <div className="relative aspect-square w-full bg-gradient-to-b from-slate-50 to-slate-100/80">
+      <div className="relative aspect-square w-full bg-gradient-to-br from-white via-slate-50 to-slate-100/70 ring-1 ring-inset ring-slate-100">
         {onBulkToggle && (
           <label className="absolute left-1.5 top-1.5 z-20 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg bg-white/95 shadow-md ring-1 ring-slate-200/80">
             <input
@@ -134,7 +134,7 @@ export function ProductCard({
         <img
           src={imageUrl}
           alt={product.name}
-          className="absolute inset-0 w-full h-full object-contain p-2"
+          className="absolute inset-0 w-full h-full object-contain p-3.5 drop-shadow-sm"
           onError={(e) => { const t = e.currentTarget; if (t.src !== "/placeholder.svg") t.src = "/placeholder.svg"; }}
         />
         {product.stock === 0 ? (
@@ -149,11 +149,11 @@ export function ProductCard({
       </div>
 
       {/* Brand + name */}
-      <div className="px-3 pt-2.5 pb-1">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-blue-700">
+      <div className="px-3 pt-3 pb-1">
+        <p className="text-[9.5px] font-bold uppercase tracking-[0.12em] text-blue-700/90">
           {product.brand}
         </p>
-        <h3 className="mt-0.5 line-clamp-2 text-[13px] font-bold leading-snug text-slate-900">
+        <h3 className="mt-1 line-clamp-2 text-[13.5px] font-bold leading-snug tracking-tight text-slate-900">
           {product.name}
         </h3>
       </div>
@@ -216,21 +216,28 @@ export function ProductCard({
       </div>
 
       {/* Pricing — Ex-VAT with green tint, spaced for readability */}
-      <div className="mt-auto flex flex-col gap-0.5 border-t border-slate-100 px-3 py-2.5 shop-card-price-tint">
-        <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
-          Ex-VAT
-        </p>
-        <p className="text-lg font-bold leading-none text-slate-900">
-          {"£"}
-          {product.casePrice.toFixed(2)}
-        </p>
-        <p className="text-[10px] text-slate-500">
-          {"£"}
-          {product.unitPrice.toFixed(2)}/unit
-        </p>
-        <p className="text-[9px] font-mono text-slate-500 pt-0.5">
-          Order limit: {maxPerOrder} case{maxPerOrder === 1 ? "" : "s"}
-        </p>
+      <div className="mt-auto flex flex-col gap-1 border-t border-slate-100 px-3 py-3 shop-card-price-tint">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="flex items-baseline gap-1.5">
+            <p className="text-xl font-black leading-none tracking-tight text-slate-900 tabular-nums">
+              {"£"}
+              {product.casePrice.toFixed(2)}
+            </p>
+            <p className="text-[10px] font-semibold text-slate-400">/case</p>
+          </div>
+          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+            Ex-VAT
+          </p>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10.5px] font-semibold text-slate-500 tabular-nums">
+            {"£"}
+            {product.unitPrice.toFixed(2)}<span className="text-slate-400"> / unit</span>
+          </p>
+          <p className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold font-mono text-slate-500">
+            Limit {maxPerOrder}
+          </p>
+        </div>
       </div>
 
       {/* Quick Add -- large tap targets */}

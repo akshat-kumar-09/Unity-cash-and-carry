@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { createOrderSchema } from "@/lib/validations"
 import { auth } from "@/auth"
 import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
+import { resolveProductPrice, isPriceTier, type PriceTier } from "@/lib/pricing"
 
 export async function GET(request: NextRequest) {
   try {
@@ -87,21 +88,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Calculate totals
-    let subtotal = 0
-    const orderItems = parsed.data.items.map((item) => {
-      const product = products.find((p) => p.id === item.productId)!
-      const totalPrice = product.casePrice * item.quantity
-      subtotal += totalPrice
-      return {
-        productId: product.id,
-        quantity: item.quantity,
-        unitPrice: product.casePrice,
-        totalPrice,
-      }
-    })
-
-    // Fetch user for wallet balance
+    // Fetch user for wallet balance + price tier
     const user = await prisma.user.findUnique({
       where: { id: (session.user as any).id },
     })
@@ -112,6 +99,23 @@ export async function POST(request: NextRequest) {
     if (user.role !== 'admin' && user.complianceStatus !== 'approved') {
       return NextResponse.json({ error: 'Your account is pending compliance verification. Contact Unity to get approved.' }, { status: 403 })
     }
+
+    const tier: PriceTier = user.role === "admin" ? "C" : isPriceTier(user.priceTier) ? user.priceTier : "C"
+
+    // Calculate totals (tier-resolved wholesale price — server-computed, never trusts client input)
+    let subtotal = 0
+    const orderItems = parsed.data.items.map((item) => {
+      const product = products.find((p) => p.id === item.productId)!
+      const { casePrice } = resolveProductPrice(product, tier)
+      const totalPrice = casePrice * item.quantity
+      subtotal += totalPrice
+      return {
+        productId: product.id,
+        quantity: item.quantity,
+        unitPrice: casePrice,
+        totalPrice,
+      }
+    })
 
     let vapeDutyAmount = 0
     for (const item of parsed.data.items) {

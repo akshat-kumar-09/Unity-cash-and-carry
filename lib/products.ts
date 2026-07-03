@@ -8,9 +8,6 @@ export type Brand =
   | "IVG"
   | "Higo"
   | "Lost Mary"
-  | "Hayati"
-  | "Pyne Pods"
-  | "Dojo"
   | "Rizla"
   | "RAW"
   | "Swan"
@@ -23,11 +20,18 @@ export type Product = {
   description?: string
   brand: string // Changed from Brand to string for API compatibility
   category: string // Changed from Category to string for API compatibility
+  /** Real per-brand product line from the site catalogue (e.g. "BB 4000 Kit") — null when not applicable. */
+  productLine?: string | null
   sku: string
   packLabel: string
   unitsPerPack: number
   unitPrice: number
   casePrice: number
+  /** Tier A/B wholesale overrides (admin-only view) — null/absent falls back to unitPrice/casePrice. */
+  unitPriceA?: number | null
+  casePriceA?: number | null
+  unitPriceB?: number | null
+  casePriceB?: number | null
   /** Max cases per order for this product (enforced in cart + checkout). */
   maxQtyPerOrder?: number
   badge?: string | null
@@ -67,9 +71,6 @@ export const brandFilters = [
   "IVG",
   "SKE",
   "Lost Mary",
-  "Hayati",
-  "Pyne Pods",
-  "Dojo",
   "Accessories",
 ] as const
 export type BrandFilter = (typeof brandFilters)[number]
@@ -165,12 +166,6 @@ export const products: Product[] = [
   vape("Higo", "Crystal 4000", "Fresh Mint", "HG4K", "Box of 10", 10, 3.8, 38.0),
   vape("Higo", "Crystal 4000", "Mango", "HG4K", "Box of 10", 10, 3.8, 38.0, "Popular"),
   vape("Higo", "Crystal 4000", "Strawberry Ice Cream", "HG4K", "Box of 10", 10, 3.8, 38.0),
-
-  // ── Pyne Pods (Pack of 10) ──────────────────────────────────────
-  vape("Pyne Pods", "Pod", "Blue Razz", "PP", "Pack of 10", 10, 3.0, 30.0),
-  vape("Pyne Pods", "Pod", "Blueberry Sour", "PP", "Pack of 10", 10, 3.0, 30.0),
-  vape("Pyne Pods", "Pod", "Watermelon", "PP", "Pack of 10", 10, 3.0, 30.0),
-  vape("Pyne Pods", "Pod", "Cherry Cola", "PP", "Pack of 10", 10, 3.0, 30.0),
 
   // ── Accessories ──────────────────────────────────────────────────
   {

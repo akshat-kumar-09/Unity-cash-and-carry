@@ -17,6 +17,8 @@ model User {
   password      String
   tradeCode     String?   @unique
   role          String    @default("customer") // admin, trader, customer, rep
+  /// Wholesale pricing tier: "A" (most valued), "B" (valued), "C" (casual/default)
+  priceTier     String    @default("C")
   walletBalance Float     @default(45.00)
   // HMRC Compliance — retailers must be verified before ordering
   vatNumber              String?
@@ -42,11 +44,20 @@ model Product {
   description   String    @default("")
   brand         String
   category      String
+  /// Real per-brand product line from the site catalogue (e.g. "BB 4000 Kit", "600 Kit") — null for non-vape/accessory items.
+  productLine   String?
   sku           String    @unique
   packLabel     String
   unitsPerPack  Int
+  /// Tier C (casual/default) price — used when no tier-specific override is set.
   unitPrice     Float
   casePrice     Float
+  /// Tier A (most valued retailers) override — null falls back to unitPrice/casePrice.
+  unitPriceA    Float?
+  casePriceA    Float?
+  /// Tier B (valued retailers) override — null falls back to unitPrice/casePrice.
+  unitPriceB    Float?
+  casePriceB    Float?
   /// Max cases of this SKU a customer can order per line (wholesale cap).
   maxQtyPerOrder Int      @default(100)
   badge         String?

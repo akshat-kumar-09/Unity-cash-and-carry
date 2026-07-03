@@ -40,6 +40,7 @@ export const SIMPLE_BROWSE_SLUGS: readonly ProductCategorySlug[] = [
   "filters",
   "lighters_fire",
   "other",
+  "nicotine_pouches",
 ]
 
 export type ShopCategoryStatus = "active" | "coming_soon"
@@ -58,7 +59,7 @@ export type ShopCategoryDef = {
 export const SHOP_CATEGORIES: ShopCategoryDef[] = [
   { id: "vapes", label: "Vaping", keywords: "Disposables • pods • kits • hardware", status: "active", drilldown: "vape_style" },
   { id: "e_liquids", label: "E-liquids", keywords: "Salts • freebase • shortfills • bar salts", status: "active", drilldown: "vape_style" },
-  { id: "nicotine_pouches", label: "Nicotine pouches", keywords: "Snus • white pouches • nic pods", status: "coming_soon", drilldown: "none" },
+  { id: "nicotine_pouches", label: "Nicotine pouches", keywords: "Snus • white pouches • nic pods", status: "active", drilldown: "none" },
   { id: "cbd_hemp", label: "CBD & hemp", keywords: "Oils • edibles • legal UK", status: "coming_soon", drilldown: "none" },
   { id: "limited_editions", label: "Limited editions", keywords: "Drops • exclusives • collabs", status: "coming_soon", drilldown: "none" },
   { id: "coils", label: "Coils & heating", keywords: "Mesh • stock coils • pods", status: "coming_soon", drilldown: "none" },
@@ -107,6 +108,15 @@ export const VAPING_BRANDS = [
 ] as const
 
 export type VapingBrand = (typeof VAPING_BRANDS)[number]
+
+/** Real per-brand product lines from the site catalogue — used as a filter once a brand is picked while browsing. */
+export const PRODUCT_LINES_BY_BRAND: Record<string, string[]> = {
+  "Elf Bar": ["Dual 10K", "Elfliq Salts", "600 Kit", "AF5500", "4in1", "Plus 50"],
+  "Lost Mary": ["BM600", "BM6000", "MaryLiq Salts"],
+  SKE: ["Bar 15K", "Crystal Bar", "4in1", "Salts"],
+  IVG: ["2400", "Pro", "Smart Max", "Smart Max Refills", "IVG Salts", "2400 Pods"],
+  Higo: ["Pulse Kit", "Pulse Pods", "BB 4000 Kit", "BB 4000 Pods", "Alfa Pro Kit", "Higo Salts"],
+}
 
 /** API sort priority (lower = first) */
 export const CATEGORY_SORT_ORDER: Record<string, number> = {

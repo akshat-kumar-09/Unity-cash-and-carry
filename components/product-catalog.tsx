@@ -7,7 +7,7 @@ import { ProductCard } from "./product-card"
 import { BrandHeader } from "./brand-header"
 import { EditProductModal } from "./edit-product-modal"
 import { BulkEditProductsModal } from "./bulk-edit-products-modal"
-import type { ProductCategorySlug } from "@/lib/product-categories"
+import { PRODUCT_LINES_BY_BRAND, type ProductCategorySlug } from "@/lib/product-categories"
 
 function isLiveCatalogProduct(p: Product) {
   return !String(p.id).startsWith("demo-")
@@ -83,6 +83,12 @@ export function ProductCatalog({
   const [usingDemo, setUsingDemo] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkModalOpen, setBulkModalOpen] = useState(false)
+  const [selectedLine, setSelectedLine] = useState<string | null>(null)
+  const [selectingAll, setSelectingAll] = useState(false)
+
+  const availableLines = (categorySlug === "vapes" || categorySlug === "e_liquids") && activeBrand !== "All"
+    ? PRODUCT_LINES_BY_BRAND[activeBrand]
+    : undefined
 
   const fetchPage = useCallback(async (pageNum: number, append: boolean) => {
     const params = new URLSearchParams()
@@ -170,6 +176,7 @@ export function ProductCatalog({
         if (p.category !== categorySlug) return false
         if (!matchesBrandFilter(p, activeBrand)) return false
         if (!isAdmin && subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
+        if (selectedLine && p.productLine !== selectedLine) return false
         if (q && !p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q)) return false
         return true
       })
@@ -180,16 +187,21 @@ export function ProductCatalog({
         // Subcategory rules use heuristics on name/SKU; renaming can drop "600" etc. and hide the product.
         // Admins need to see every product the API returned for this category/brand so edits don't "vanish".
         if (!isAdmin && subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
+        if (selectedLine && p.productLine !== selectedLine) return false
         if (q && !p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !(p.sku ?? "").toLowerCase().includes(q)) return false
         return true
       })
     }
     return [...list].sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name))
-  }, [products, usingDemo, activeBrand, search, subcategoryFilter, categorySlug, isAdmin])
+  }, [products, usingDemo, activeBrand, search, subcategoryFilter, selectedLine, categorySlug, isAdmin])
 
   useEffect(() => {
     setSelectedIds([])
   }, [categorySlug, activeBrand, search, subcategoryFilter, usingDemo])
+
+  useEffect(() => {
+    setSelectedLine(null)
+  }, [categorySlug, activeBrand])
 
   const toggleSelectProduct = useCallback((id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -197,7 +209,7 @@ export function ProductCatalog({
 
   const clearSelection = useCallback(() => setSelectedIds([]), [])
 
-  const useClientFilter = usingDemo || subcategoryFilter != null
+  const useClientFilter = usingDemo || subcategoryFilter != null || selectedLine != null
   const demoTotal = filtered.length
   const demoPageSize = PAGE_SIZE
   const demoDisplayed = useClientFilter ? filtered.slice(0, page * demoPageSize) : products
@@ -205,12 +217,39 @@ export function ProductCatalog({
   const totalCount = useClientFilter ? demoTotal : total
   const hasMore = useClientFilter ? demoHasMore : products.length < total
 
-  const selectAllVisibleLive = useCallback(() => {
-    const ids = demoDisplayed
-      .filter((p) => isAdmin && !usingDemo && isLiveCatalogProduct(p))
-      .map((p) => p.id)
-    setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])))
-  }, [demoDisplayed, isAdmin, usingDemo])
+  // Selects every product matching the current category/brand/line filter — not just
+  // whatever page happens to be loaded on screen — since a brand/line can exceed the
+  // per-request API cap (100) and flavours within it are almost always priced together.
+  const selectAllInCategory = useCallback(async () => {
+    if (!isAdmin || usingDemo) return
+    setSelectingAll(true)
+    try {
+      const collected: Product[] = []
+      let pageNum = 1
+      while (true) {
+        const params = new URLSearchParams()
+        params.set("category", categorySlug)
+        if (activeBrand !== "All") params.append("brand", activeBrand)
+        if (search.trim()) params.append("search", search.trim())
+        params.set("page", String(pageNum))
+        params.set("limit", "100")
+        const res = await fetch(`/api/products?${params.toString()}`)
+        const data = await res.json()
+        if (!res.ok || !Array.isArray(data?.products)) break
+        collected.push(...data.products)
+        const totalPages = data.totalPages ?? 1
+        if (pageNum >= totalPages || data.products.length === 0) break
+        pageNum += 1
+      }
+      const ids = collected
+        .filter((p) => isLiveCatalogProduct(p))
+        .filter((p) => !selectedLine || p.productLine === selectedLine)
+        .map((p) => p.id)
+      setSelectedIds(Array.from(new Set(ids)))
+    } finally {
+      setSelectingAll(false)
+    }
+  }, [isAdmin, usingDemo, categorySlug, activeBrand, search, selectedLine])
 
   const handleLoadMore = async () => {
     if (useClientFilter) {
@@ -281,10 +320,17 @@ export function ProductCatalog({
           {isAdmin && !usingDemo && !loading && totalCount > 0 && (
             <button
               type="button"
-              onClick={selectAllVisibleLive}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+              onClick={selectAllInCategory}
+              disabled={selectingAll}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-700 hover:bg-slate-100 disabled:opacity-60"
             >
-              Select visible
+              {selectingAll
+                ? "Selecting…"
+                : selectedLine
+                  ? `Select all ${selectedLine}`
+                  : activeBrand !== "All"
+                    ? `Select all ${activeBrand}`
+                    : "Select all in category"}
             </button>
           )}
         </div>
@@ -295,6 +341,37 @@ export function ProductCatalog({
           </p>
         </div>
       </div>
+
+      {/* Real per-brand product line filter (e.g. Higo: Pulse Kit, BB 4000 Kit, Alfa Pro Kit…) */}
+      {availableLines && availableLines.length > 0 && (
+        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button
+            type="button"
+            onClick={() => setSelectedLine(null)}
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
+              selectedLine === null
+                ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700"
+            }`}
+          >
+            All
+          </button>
+          {availableLines.map((line) => (
+            <button
+              key={line}
+              type="button"
+              onClick={() => setSelectedLine(line)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
+                selectedLine === line
+                  ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700"
+              }`}
+            >
+              {line}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* API fallback notice — calm, not alarming */}
       {error && (

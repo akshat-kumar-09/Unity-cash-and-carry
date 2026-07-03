@@ -24,13 +24,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
-    const { name, description, imageUrl, unitPrice, casePrice, unitsPerPack, packLabel, maxQtyPerOrder, liquidVolumeMl, isSubjectToVapeDuty, nicotineStrengthMg } = parsed.data
+    const { name, description, imageUrl, unitPrice, casePrice, unitPriceA, casePriceA, unitPriceB, casePriceB, unitsPerPack, packLabel, maxQtyPerOrder, liquidVolumeMl, isSubjectToVapeDuty, nicotineStrengthMg } = parsed.data
     const data: {
       name?: string
       description?: string
       imageUrl?: string | null
       unitPrice?: number
       casePrice?: number
+      unitPriceA?: number | null
+      casePriceA?: number | null
+      unitPriceB?: number | null
+      casePriceB?: number | null
       unitsPerPack?: number
       packLabel?: string
       maxQtyPerOrder?: number
@@ -45,6 +49,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     if (unitPrice !== undefined) data.unitPrice = unitPrice
     if (casePrice !== undefined) data.casePrice = casePrice
+    if (unitPriceA !== undefined) data.unitPriceA = unitPriceA
+    if (casePriceA !== undefined) data.casePriceA = casePriceA
+    if (unitPriceB !== undefined) data.unitPriceB = unitPriceB
+    if (casePriceB !== undefined) data.casePriceB = casePriceB
     if (unitsPerPack !== undefined) data.unitsPerPack = unitsPerPack
     if (packLabel !== undefined) data.packLabel = packLabel.trim()
     if (maxQtyPerOrder !== undefined) data.maxQtyPerOrder = maxQtyPerOrder

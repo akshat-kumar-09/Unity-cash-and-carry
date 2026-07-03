@@ -43,6 +43,10 @@ export async function POST(request: NextRequest) {
       description?: string
       casePrice?: number
       unitPrice?: number
+      unitPriceA?: number | null
+      casePriceA?: number | null
+      unitPriceB?: number | null
+      casePriceB?: number | null
       unitsPerPack?: number
       packLabel?: string
       maxQtyPerOrder?: number
@@ -50,6 +54,10 @@ export async function POST(request: NextRequest) {
     if (patchIn.description !== undefined) data.description = patchIn.description.trim()
     if (patchIn.casePrice !== undefined) data.casePrice = patchIn.casePrice
     if (patchIn.unitPrice !== undefined) data.unitPrice = patchIn.unitPrice
+    if (patchIn.unitPriceA !== undefined) data.unitPriceA = patchIn.unitPriceA
+    if (patchIn.casePriceA !== undefined) data.casePriceA = patchIn.casePriceA
+    if (patchIn.unitPriceB !== undefined) data.unitPriceB = patchIn.unitPriceB
+    if (patchIn.casePriceB !== undefined) data.casePriceB = patchIn.casePriceB
     if (patchIn.unitsPerPack !== undefined) data.unitsPerPack = patchIn.unitsPerPack
     if (patchIn.packLabel !== undefined) data.packLabel = patchIn.packLabel.trim()
     if (patchIn.maxQtyPerOrder !== undefined) data.maxQtyPerOrder = patchIn.maxQtyPerOrder

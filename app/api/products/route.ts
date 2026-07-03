@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { productSchema } from "@/lib/validations"
 import { auth } from "@/auth"
 import { CATEGORY_SORT_ORDER } from "@/lib/product-categories"
+import { resolveProductPrice, isPriceTier, type PriceTier } from "@/lib/pricing"
 
 async function resolveSku(provided: string | undefined): Promise<string> {
   let sku =
@@ -102,8 +103,24 @@ export async function GET(request: NextRequest) {
     }
 
     const totalPages = Math.ceil(total / limit)
+
+    const session = await auth()
+    const sessionUser = session?.user as { id?: string; role?: string } | undefined
+    let responseProducts = products
+    if (sessionUser?.role !== "admin") {
+      let tier: PriceTier = "C"
+      if (sessionUser?.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: sessionUser.id },
+          select: { priceTier: true },
+        })
+        if (isPriceTier(dbUser?.priceTier)) tier = dbUser!.priceTier as PriceTier
+      }
+      responseProducts = products.map((p) => ({ ...p, ...resolveProductPrice(p, tier) }))
+    }
+
     return NextResponse.json({
-      products,
+      products: responseProducts,
       total,
       page,
       limit,

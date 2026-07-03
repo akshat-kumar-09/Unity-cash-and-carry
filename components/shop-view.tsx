@@ -38,10 +38,32 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
     return SHOP_CATEGORIES.find((c) => c.id === selectedCategorySlug)?.label ?? selectedCategorySlug
   }, [selectedCategorySlug])
 
+  const backButtonLabel = useMemo(() => {
+    if (
+      selectedCategorySlug &&
+      (selectedCategorySlug === "vapes" || selectedCategorySlug === "e_liquids") &&
+      selectedSubcategory &&
+      selectedBrand
+    ) {
+      return "Back to brands"
+    }
+    return "Back to categories"
+  }, [selectedCategorySlug, selectedSubcategory, selectedBrand])
+
   const resetBrowse = () => {
-    setSelectedCategorySlug(null)
-    setSelectedSubcategory(null)
-    setSelectedBrand(null)
+    if (
+      selectedCategorySlug &&
+      (selectedCategorySlug === "vapes" || selectedCategorySlug === "e_liquids") &&
+      selectedSubcategory &&
+      selectedBrand
+    ) {
+      setSelectedSubcategory(null)
+      setSelectedBrand(null)
+    } else {
+      setSelectedCategorySlug(null)
+      setSelectedSubcategory(null)
+      setSelectedBrand(null)
+    }
   }
 
   return (
@@ -116,7 +138,7 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
                 className="pointer-events-auto unity-tap flex w-full max-w-md items-center justify-center gap-2 rounded-2xl border border-slate-200/90 bg-white/95 py-3 pl-4 pr-4 text-sm font-bold uppercase tracking-wide text-blue-700 shadow-lg shadow-slate-900/10 ring-1 ring-slate-200/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/90"
               >
                 <ChevronLeft className="h-5 w-5 shrink-0" aria-hidden />
-                Back to categories
+                {backButtonLabel}
               </button>
             </div>
 

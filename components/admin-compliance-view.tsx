@@ -14,8 +14,14 @@ import {
   UserCheck,
   UserX,
   Users,
+  Link as LinkIcon,
+  KeyRound,
+  Copy,
 } from "lucide-react"
 import { AppScreenHeader } from "@/components/app-screen-header"
+import { toast } from "sonner"
+
+type PriceTier = "A" | "B" | "C"
 
 type Trader = {
   id: string
@@ -28,10 +34,24 @@ type Trader = {
   retailerLicenseRef: string | null
   complianceStatus: string
   complianceNotes: string | null
+  priceTier: PriceTier
   createdAt: string
   _count: {
     orders: number
   }
+}
+
+const TIER_LABELS: Record<PriceTier, string> = {
+  A: "Tier A — Most valued",
+  B: "Tier B — Valued",
+  C: "Tier C — Casual",
+}
+
+/** Temp password is generated + stored in complianceNotes at registration time (see api/auth/register). */
+function extractTempPassword(notes: string | null): string | null {
+  if (!notes) return null
+  const match = notes.match(/Generated Temp Password:\s*([^\s\n]+)/)
+  return match ? match[1] : null
 }
 
 export function AdminComplianceView() {
@@ -40,6 +60,8 @@ export function AdminComplianceView() {
   const [error, setError] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedTiers, setSelectedTiers] = useState<Record<string, PriceTier>>({})
+  const [linkingId, setLinkingId] = useState<string | null>(null)
 
   const fetchTraders = async () => {
     try {
@@ -47,7 +69,15 @@ export function AdminComplianceView() {
       const res = await fetch("/api/admin/compliance")
       if (!res.ok) throw new Error("Failed to load traders list")
       const data = await res.json()
-      setTraders(Array.isArray(data) ? data : [])
+      const list: Trader[] = Array.isArray(data) ? data : []
+      setTraders(list)
+      setSelectedTiers((prev) => {
+        const next = { ...prev }
+        for (const t of list) {
+          if (!(t.id in next)) next[t.id] = t.priceTier || "C"
+        }
+        return next
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong")
     } finally {
@@ -69,6 +99,7 @@ export function AdminComplianceView() {
           userId,
           complianceStatus: status,
           complianceNotes: notes || `Updated to ${status} via Admin panel.`,
+          priceTier: status === "approved" ? selectedTiers[userId] || "C" : undefined,
         }),
       })
 
@@ -78,6 +109,38 @@ export function AdminComplianceView() {
       setError(e instanceof Error ? e.message : "Failed to update trader status")
     } finally {
       setUpdatingId(null)
+    }
+  }
+
+  const handleCopyInviteLink = async (trader: Trader) => {
+    setLinkingId(trader.id)
+    try {
+      const res = await fetch("/api/admin/settings/invite-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trader.email }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to generate invite link")
+
+      const portalUrl = typeof window !== "undefined" ? window.location.origin : ""
+      const link = `${portalUrl}/invite?token=${data.token}`
+      const tempPassword = extractTempPassword(trader.complianceNotes)
+
+      const clipboardText = tempPassword
+        ? `${link}\n\nEmail: ${trader.email}\nTemporary password: ${tempPassword}`
+        : link
+
+      await navigator.clipboard.writeText(clipboardText)
+      toast.success(
+        tempPassword
+          ? `Copied invite link + temp password for ${trader.email}`
+          : `Copied invite link for ${trader.email} (no temp password on file)`
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to copy invite link")
+    } finally {
+      setLinkingId(null)
     }
   }
 
@@ -295,6 +358,64 @@ export function AdminComplianceView() {
                           </span>
                         </div>
                       </div>
+
+                      {/* Pricing tier + invite tools */}
+                      <div className="border-t border-slate-100 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Price tier
+                          </span>
+                          <select
+                            value={selectedTiers[trader.id] || "C"}
+                            onChange={(e) =>
+                              setSelectedTiers((prev) => ({ ...prev, [trader.id]: e.target.value as PriceTier }))
+                            }
+                            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
+                          >
+                            {(Object.keys(TIER_LABELS) as PriceTier[]).map((t) => (
+                              <option key={t} value={t}>
+                                {TIER_LABELS[t]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          onClick={() => handleCopyInviteLink(trader)}
+                          disabled={linkingId === trader.id}
+                          className="flex items-center gap-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 font-bold text-[10px] uppercase tracking-wider py-2 px-3 rounded-lg transition-all active:scale-[0.97] disabled:opacity-50"
+                        >
+                          {linkingId === trader.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <LinkIcon className="h-3.5 w-3.5" />
+                          )}
+                          Copy invite link
+                        </button>
+                      </div>
+
+                      {extractTempPassword(trader.complianceNotes) && (
+                        <div className="flex items-center gap-1.5 pt-2 text-[11px]">
+                          <KeyRound className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                          <span className="text-slate-400 font-semibold">Temp password:</span>
+                          <code className="font-mono font-bold text-slate-700">
+                            {extractTempPassword(trader.complianceNotes)}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const pw = extractTempPassword(trader.complianceNotes)
+                              if (pw) {
+                                navigator.clipboard.writeText(pw)
+                                toast.success("Password copied")
+                              }
+                            }}
+                            className="text-slate-400 hover:text-blue-600"
+                            aria-label="Copy temp password"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
 
                       {/* Admin actions / notes */}
                       <div className="border-t border-slate-100 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">

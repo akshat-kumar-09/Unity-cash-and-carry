@@ -43,6 +43,55 @@ function slugify(s: string): string {
   return s.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '').slice(0, 6)
 }
 
+// Real Lost Mary BM6000 range with client-supplied "perfect" images.
+// Images hosted on the Unity Shopify store CDN (upload the matching files in
+// shopify-uploads/lost-mary-bm6000/ to Shopify Files; filenames match).
+const LOST_MARY_BM6000: { flavour: string; imageUrl: string }[] = [
+  { flavour: 'Banana Ice', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-banana-ice.png' },
+  { flavour: 'Berry Apple Peach', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-berry-apple-peach.png' },
+  { flavour: 'Blackcurrant Apple', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-blackcurrant-apple.png' },
+  { flavour: 'Blackcurrant Lemonade', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-blackcurrant-lemonade.png' },
+  { flavour: 'Blue Razz Cherry', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-blue-razz-cherry.png' },
+  { flavour: 'Blue Razz Lemonade', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-blue-razz-lemonade.png' },
+  { flavour: 'Blueberry', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-blueberry.png' },
+  { flavour: 'Blueberry Cherry Cranberry', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-blueberry-cherry-cranberry.png' },
+  { flavour: 'Blueberry Sour Raspberry', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-blueberry-sour-raspberry.png' },
+  { flavour: 'Cherry Berry', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-cherry-berry.png' },
+  { flavour: 'Cherry Cola', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-cherry-cola.png' },
+  { flavour: 'Cherry Ice', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-cherry-ice.png' },
+  { flavour: 'Cherry Peach Lemonade', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-cherry-peach-lemonade.png' },
+  { flavour: 'Cola', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-cola.png' },
+  { flavour: 'Double Apple', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-double-apple.png' },
+  { flavour: 'Fizzy Cherry', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-fizzy-cherry.png' },
+  { flavour: 'Fresh Mint', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-fresh-mint.png' },
+  { flavour: 'Fruit Medley', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-fruit-medley.png' },
+  { flavour: 'Fruit Punch', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-fruit-punch.png' },
+  { flavour: 'Grape', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-grape.png' },
+  { flavour: 'Juicy Peach', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-juicy-peach.png' },
+  { flavour: 'Kiwi Passion Fruit Guava', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-kiwi-passion-fruit-guava.png' },
+  { flavour: 'Latte', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-latte.png' },
+  { flavour: 'Lemon Lime', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-lemon-lime.png' },
+  { flavour: 'Mad Blue', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-mad-blue.png' },
+  { flavour: 'Menthol', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-menthol.png' },
+  { flavour: 'Miami Mint', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-miami-mint.png' },
+  { flavour: 'Mr Blue', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-mr-blue.png' },
+  { flavour: 'Orange Bruu', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-orange-bruu.png' },
+  { flavour: 'Pineapple Ice', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-pineapple-ice.png' },
+  { flavour: 'Pineapple Passion Fruit', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-pineapple-passion-fruit.png' },
+  { flavour: 'Pink Lemonade', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-pink-lemonade.png' },
+  { flavour: 'Raspberry Peach', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-raspberry-peach.png' },
+  { flavour: 'Red Apple Ice', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-red-apple-ice.png' },
+  { flavour: 'Strawberry Ice', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-strawberry-ice.png' },
+  { flavour: 'Strawberry Kiwi', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-strawberry-kiwi.jpg' },
+  { flavour: 'Strawberry Lime', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-strawberry-lime.jpg' },
+  { flavour: 'Strawberry Raspberry Cherry Ice', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-strawberry-raspberry-cherry-ice.jpg' },
+  { flavour: 'Strawberry Watermelon', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-strawberry-watermelon.jpg' },
+  { flavour: 'Triple Berry', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-triple-berry.jpg' },
+  { flavour: 'Triple Mango', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-triple-mango.jpg' },
+  { flavour: 'Watermelon Ice', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-watermelon-ice.jpg' },
+  { flavour: 'Watermelon Kiwi', imageUrl: 'https://cdn.shopify.com/s/files/1/0806/4594/7715/files/lost-mary-bm6000-watermelon-kiwi.jpg' },
+]
+
 async function main() {
   console.log('Seeding database...')
 
@@ -118,13 +167,14 @@ async function main() {
     unitPrice: number
     casePrice: number
     badge?: string
+    imageUrl?: string
     isSubjectToVapeDuty: boolean
     liquidVolumeMl: number
     nicotineStrengthMg: number
   }[] = []
   const usedSkus = new Set<string>()
 
-  function addVape(brand: string, line: string, flavour: string, skuPrefix: string, packLabel: string, units: number, unitPrice: number, badge?: string) {
+  function addVape(brand: string, line: string, flavour: string, skuPrefix: string, packLabel: string, units: number, unitPrice: number, badge?: string, imageUrl?: string) {
     const slug = slugify(flavour)
     let sku = `${skuPrefix}-${slug}`.toUpperCase()
     let n = 0
@@ -149,6 +199,7 @@ async function main() {
       unitPrice,
       casePrice: Math.round(unitPrice * units * 100) / 100,
       badge,
+      imageUrl,
       isSubjectToVapeDuty: true,
       liquidVolumeMl,
       nicotineStrengthMg: 20.0,
@@ -162,6 +213,11 @@ async function main() {
       addVape(v.brand, v.line, flavour, v.skuPrefix, v.packLabel, v.units, v.unitPrice, i === 0 ? v.badge : undefined)
     })
   }
+
+  // Lost Mary BM6000 — real client range with client-supplied "perfect" images.
+  LOST_MARY_BM6000.forEach((p, i) => {
+    addVape('Lost Mary', 'BM6000', p.flavour, 'LMBM60', 'Box of 10', 10, 4.5, i === 0 ? 'New' : undefined, p.imageUrl)
+  })
 
   // Papers: Rizla & RAW variants
   const papers = [
