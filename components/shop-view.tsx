@@ -10,6 +10,7 @@ import { AdminBanner } from "@/components/admin-banner"
 import { ProductCatalog } from "@/components/product-catalog"
 import { SHOP_CATEGORIES, SIMPLE_BROWSE_SLUGS, type ProductCategorySlug } from "@/lib/product-categories"
 import type { BrandFilter } from "@/lib/products"
+import { useBackHandler } from "@/lib/use-back-handler"
 
 type ShopViewProps = {
   isAdmin: boolean
@@ -56,6 +57,15 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
     }
     return "Back to categories"
   }, [selectedCategorySlug, selectedSubcategory, selectedBrand])
+
+  // Back button: physical/browser back returns to the top category list from anywhere
+  // inside Shop browsing (one press), instead of leaving the app entirely — there was
+  // no history entry recorded for drilling into a category/brand before this.
+  useBackHandler(selectedCategorySlug !== null, () => {
+    setSelectedCategorySlug(null)
+    setSelectedSubcategory(null)
+    setSelectedBrand(null)
+  })
 
   const resetBrowse = () => {
     if (

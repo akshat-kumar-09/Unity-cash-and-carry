@@ -5,6 +5,7 @@ import { Package, Truck, X, Trash2, CheckCircle, Minus, Plus, ArrowLeft } from "
 import { useCart } from "@/lib/cart-context"
 import { useSession } from "next-auth/react"
 import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
+import { useBackHandler } from "@/lib/use-back-handler"
 
 type CheckoutFormData = {
   customerPhone: string
@@ -38,6 +39,14 @@ export function CartFooter() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<CheckoutFormData>(initialForm)
   const [formError, setFormError] = useState("")
+
+  // Back button: closes the checkout form back to the cart list first, then closes
+  // the cart sheet entirely — instead of leaving the app (no history entry otherwise).
+  useBackHandler(showCheckoutForm, () => {
+    setShowCheckoutForm(false)
+    setFormError("")
+  })
+  useBackHandler(isCartOpen && !showCheckoutForm, closeCart)
 
   // Wallet and Promo states
   const [walletBalance, setWalletBalance] = useState(0)

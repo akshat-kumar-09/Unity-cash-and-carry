@@ -9,6 +9,7 @@ import { getEffectiveMaxQtyPerOrder, getProductImageUrl } from "@/lib/products"
 import { useCart } from "@/lib/cart-context"
 import { useSession } from "next-auth/react"
 import { toast } from "sonner"
+import { useBackHandler } from "@/lib/use-back-handler"
 
 export function ProductCard({
   product,
@@ -40,6 +41,8 @@ export function ProductCard({
   const [emailInput, setEmailInput] = useState(session?.user?.email || "")
   const [submitting, setSubmitting] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  useBackHandler(showDetailModal, () => setShowDetailModal(false))
+  useBackHandler(showNotifyModal, () => setShowNotifyModal(false))
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault()
