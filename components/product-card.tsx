@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
+import { createPortal } from "react-dom"
 
 import { Minus, Plus, Pencil, ShoppingCart, Trash2, Mail } from "lucide-react"
 import type { Product } from "@/lib/products"
@@ -254,8 +255,10 @@ export function ProductCard({
         )}
       </div>
 
-      {/* Notify Me Modal */}
-      {showNotifyModal && (
+      {/* Notify Me Modal — portaled to <body>: the card's entrance animation leaves a
+          `transform` on this ancestor after it finishes (fill-mode: forwards), which
+          would otherwise trap position:fixed descendants inside the card's own box. */}
+      {showNotifyModal && createPortal(
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-150 text-left space-y-4">
             <div className="flex justify-between items-start">
@@ -268,7 +271,7 @@ export function ProductCard({
                 ✕
               </button>
             </div>
-            
+
             <p className="text-xs text-slate-500 leading-relaxed">
               <strong>{product.name}</strong> is currently out of stock. We will notify you immediately at this email once new boxes arrive in Glasgow.
             </p>
@@ -291,11 +294,12 @@ export function ProductCard({
               </button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Product Detail Modal — full description, compliance specs, bigger image */}
-      {showDetailModal && (
+      {/* Product Detail Modal — full description, compliance specs, bigger image. Also portaled, same reason as above. */}
+      {showDetailModal && createPortal(
         <div
           className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setShowDetailModal(false)}
@@ -474,7 +478,8 @@ export function ProductCard({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
