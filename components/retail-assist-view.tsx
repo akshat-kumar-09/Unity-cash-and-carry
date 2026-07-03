@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import {
   ShieldCheck,
@@ -15,8 +15,9 @@ import {
   CheckCircle,
   QrCode,
   Fingerprint,
-  Camera,
-  ScanLine,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
   FileText,
   BadgePercent,
   Sparkles,
@@ -50,6 +51,14 @@ type Order = {
   }[]
 }
 
+type WalletTransaction = {
+  id: string
+  amount: number
+  type: string
+  description: string
+  createdAt: string
+}
+
 export function RetailAssistView() {
   const { data: session } = useSession()
   const [orders, setOrders] = useState<Order[]>([])
@@ -57,17 +66,16 @@ export function RetailAssistView() {
   const [error, setError] = useState<string | null>(null)
   
   // Navigation states
-  const [activePanel, setActivePanel] = useState<"hub" | "summary" | "scanner" | "certificate">("hub")
+  const [activePanel, setActivePanel] = useState<"hub" | "summary" | "wallet" | "certificate">("hub")
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null)
 
   // Security Seal dynamic codes
   const [securityCode, setSecurityCode] = useState("")
 
-  // Scanner Simulator States
-  const [scanning, setScanning] = useState(false)
-  const [scanResult, setScanResult] = useState<any | null>(null)
-  const [cameraPermission, setCameraPermission] = useState(false)
-  const videoRef = useRef<HTMLDivElement>(null)
+  // Wallet & credits
+  const [walletBalance, setWalletBalance] = useState(0)
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([])
+  const [walletLoading, setWalletLoading] = useState(true)
 
   const fetchOrders = async () => {
     try {
@@ -82,8 +90,23 @@ export function RetailAssistView() {
     }
   }
 
+  const fetchWallet = async () => {
+    try {
+      const res = await fetch("/api/wallet")
+      if (!res.ok) throw new Error("Failed to load wallet")
+      const data = await res.json()
+      setWalletBalance(data.balance ?? 0)
+      setWalletTransactions(Array.isArray(data.transactions) ? data.transactions : [])
+    } catch {
+      // Non-critical for this hub — the Rewards tab is the source of truth for wallet errors
+    } finally {
+      setWalletLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchOrders()
+    fetchWallet()
     // Generate a secure verification signature hash for the inspector view
     const hash = Math.random().toString(36).substring(2, 10).toUpperCase()
     setSecurityCode(`UCC-VERIFY-${hash}`)
@@ -126,48 +149,6 @@ export function RetailAssistView() {
     }
   }
 
-  // Scanner actions
-  const startScanning = () => {
-    setScanning(true)
-    setScanResult(null)
-    setActivePanel("scanner")
-    // Request simulated camera access
-    setTimeout(() => {
-      setCameraPermission(true)
-    }, 1200)
-  }
-
-  const handleSimulatedScan = () => {
-    if (orders.length === 0) {
-      toast.error("No purchase history found to match barcodes against.")
-      return
-    }
-
-    // Pick a random product from history to simulate a match
-    const randomOrder = orders[Math.floor(Math.random() * orders.length)]
-    const randomItem = randomOrder.items?.[Math.floor(Math.random() * (randomOrder.items?.length || 1))]
-    const product = randomItem?.product || { name: "Elf Bar 600 Blueberry", sku: "EB6-BLUB", liquidVolumeMl: 2.0, nicotineStrengthMg: 20.0, brand: "Elf Bar", unitsPerPack: 10 }
-
-    toast.loading("Decompressing VDS data matrix stamp...", { duration: 1000 })
-
-    setTimeout(() => {
-      const units = (product as any).unitsPerPack || 10
-      setScanResult({
-        verified: true,
-        sku: product.sku,
-        name: product.name,
-        brand: product.brand,
-        volumeMl: product.liquidVolumeMl || 2.0,
-        nicotineStrengthMg: (product as any).nicotineStrengthMg || 20.0,
-        orderNumber: randomOrder.orderNumber,
-        purchasedAt: randomOrder.createdAt,
-        dutyPaid: randomItem ? Math.round(randomItem.quantity * units * (product.liquidVolumeMl || 2.0) * 0.22 * 100) / 100 : 4.40,
-        awrsId: "XX-AWRS-123456789",
-      })
-      toast.success("HMRC Excise VDS Stamp Verified!")
-    }, 1200)
-  }
-
   return (
     <div className="flex min-h-[100dvh] flex-col unity-app-screen pb-28 md:max-w-4xl md:mx-auto md:w-full md:border-x md:border-slate-200/80 md:shadow-xl bg-slate-50/50">
       <AppScreenHeader
@@ -176,8 +157,8 @@ export function RetailAssistView() {
             ? "Retail Assist"
             : activePanel === "summary"
               ? "Inspector Audit Log"
-              : activePanel === "scanner"
-                ? "VDS Stamp Scanner"
+              : activePanel === "wallet"
+                ? "Wallet & Credits"
                 : "AWRS Certificate"
         }
         subtitle={
@@ -185,8 +166,8 @@ export function RetailAssistView() {
             ? "Compliance & audit support tools"
             : activePanel === "summary"
               ? "HMRC Verification Portal"
-              : activePanel === "scanner"
-                ? "Camera stamp authenticator"
+              : activePanel === "wallet"
+                ? "Your Unity account balance"
                 : "Official Wholesaler Registration"
         }
       />
@@ -225,14 +206,16 @@ export function RetailAssistView() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={startScanning}
+                onClick={() => setActivePanel("wallet")}
                 className="flex flex-col items-center p-4 bg-white rounded-2xl border border-slate-200 shadow-sm text-center hover:border-blue-500 transition-all group"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 mb-2 group-hover:scale-105 transition-transform">
-                  <Camera className="h-5 w-5" />
+                  <Wallet className="h-5 w-5" />
                 </div>
-                <span className="text-[12px] font-bold text-slate-800">Scan Duty Stamp</span>
-                <span className="text-[9px] text-slate-400 font-semibold mt-1">Camera VDS scan</span>
+                <span className="text-[12px] font-bold text-slate-800">Wallet & Credits</span>
+                <span className="text-[9px] text-slate-400 font-semibold mt-1">
+                  {walletLoading ? "Loading..." : `£${walletBalance.toFixed(2)} balance`}
+                </span>
               </button>
 
               <button
@@ -486,8 +469,8 @@ export function RetailAssistView() {
           </div>
         )}
 
-        {activePanel === "scanner" && (
-          /* Scanner Simulation */
+        {activePanel === "wallet" && (
+          /* Real wallet balance + transaction history */
           <div className="space-y-6">
             <button
               onClick={() => setActivePanel("hub")}
@@ -496,108 +479,49 @@ export function RetailAssistView() {
               <ChevronLeft className="h-4 w-4" /> Back to Compliance Hub
             </button>
 
-            <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm flex flex-col items-center">
-              {/* Viewfinder Container */}
-              <div className="relative w-full aspect-video bg-slate-900 flex items-center justify-center text-white overflow-hidden">
-                {cameraPermission ? (
-                  <>
-                    {/* Pulsing Scan Grid Animation */}
-                    <div className="absolute inset-0 bg-emerald-500/5 animate-pulse" />
-                    <div className="absolute left-1/4 right-1/4 top-1/6 bottom-1/6 border-2 border-dashed border-emerald-400 rounded-xl flex items-center justify-center">
-                      <ScanLine className="h-10 w-10 text-emerald-400 animate-bounce duration-[2000ms]" />
-                    </div>
-                    {/* Bottom overlay simulation message */}
-                    <div className="absolute bottom-3 left-3 right-3 text-center bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] text-slate-300 font-medium">
-                      Simulated Camera Viewfinder Active (VDS Code Detect Mode)
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center gap-2 p-6 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                    <span className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">
-                      Initializing Camera Feed...
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Scanner Trigger panel */}
-              <div className="p-6 w-full text-center space-y-4">
-                <div className="text-left space-y-1">
-                  <h3 className="text-sm font-bold text-slate-800">Scan Vape Duty Stamp</h3>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Point your camera at the Data Matrix QR stamp on your product pack. The app will decode the stamp, verify excise compliance, and match it to your Unity purchase logs.
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSimulatedScan}
-                    disabled={!cameraPermission}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all disabled:opacity-50"
-                  >
-                    <ScanLine className="h-4.5 w-4.5" />
-                    Simulate Scan Stamp
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActivePanel("hub")}
-                    className="px-5 py-3 border border-slate-200 bg-white text-slate-600 text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-slate-50 transition-all"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
+            <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-blue-600 to-blue-700 p-6 text-white shadow-lg shadow-blue-600/20">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-blue-100">Available Balance</p>
+              {walletLoading ? (
+                <Loader2 className="h-7 w-7 animate-spin text-white mt-2" />
+              ) : (
+                <p className="text-4xl font-black tracking-tight mt-1">£{walletBalance.toFixed(2)}</p>
+              )}
+              <p className="text-[11px] text-blue-100 mt-2">Applied automatically at checkout — see Rewards tab to redeem.</p>
             </div>
 
-            {/* Scan Results Panel */}
-            {scanResult && (
-              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/40 p-5 space-y-3.5 text-left border-l-4 border-l-emerald-500">
-                <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
-                  <span className="text-[11px] font-black text-emerald-800 uppercase tracking-widest flex items-center gap-1.5">
-                    <ShieldCheck className="h-4 w-4" /> Compliance Verified
-                  </span>
-                  <span className="text-[9px] font-black text-slate-400 font-mono">{scanResult.sku}</span>
-                </div>
-                
-                <div className="space-y-1.5">
-                  <h4 className="font-black text-slate-950 text-sm">{scanResult.name}</h4>
-                  <p className="text-[11px] text-slate-500">
-                    Wholesale Supplier: <span className="font-semibold text-slate-700">{scanResult.brand}</span> (AWRS: {scanResult.awrsId})
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 py-1.5 border-y border-dashed border-emerald-100 text-[10.5px]">
-                  <div>
-                    <span className="text-slate-400 font-bold uppercase tracking-wider block">Sourced Via Invoice</span>
-                    <span className="font-mono font-bold text-slate-700 block mt-0.5">{scanResult.orderNumber.split("-")[1]}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 font-bold uppercase tracking-wider block">Excise Purchase Date</span>
-                    <span className="font-semibold text-slate-700 block mt-0.5">{formatDate(scanResult.purchasedAt)}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-[10.5px] pb-1.5 border-b border-dashed border-emerald-100">
-                  <div>
-                    <span className="text-slate-400 font-bold uppercase tracking-wider block">Liquid Volume</span>
-                    <span className="font-semibold text-slate-750 block mt-0.5">{scanResult.volumeMl}ml e-liquid</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 font-bold uppercase tracking-wider block">Nicotine Strength</span>
-                    <span className="font-semibold text-slate-750 block mt-0.5">
-                      {scanResult.nicotineStrengthMg > 0 ? `${scanResult.nicotineStrengthMg}mg/ml` : "Nicotine-Free"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center text-[11px] font-bold text-slate-700">
-                  <span>Excise Duty Paid (VDS Match):</span>
-                  <span className="text-emerald-700 font-black">£{scanResult.dutyPaid.toFixed(2)}</span>
-                </div>
+            <div className="rounded-2xl border border-slate-200/90 bg-white overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction History</h4>
               </div>
-            )}
+              {walletLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                </div>
+              ) : walletTransactions.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-[12px]">
+                  No wallet activity yet.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-50">
+                  {walletTransactions.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between px-4 py-3">
+                      <div className="min-w-0 flex items-center gap-2.5">
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${t.amount >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}>
+                          {t.amount >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-bold text-slate-800 truncate">{t.description}</p>
+                          <p className="text-[10px] text-slate-400 font-semibold">{formatDate(t.createdAt)}</p>
+                        </div>
+                      </div>
+                      <span className={`font-mono font-bold text-sm shrink-0 pl-2 ${t.amount >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                        {t.amount >= 0 ? "+" : ""}£{t.amount.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
