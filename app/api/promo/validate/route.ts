@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
+import { rateLimit } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const userId = (session.user as any)?.id ?? session.user?.email ?? "unknown"
+    const limited = rateLimit(`promo:${userId}`, 15, 10 * 60 * 1000)
+    if (!limited.allowed) {
+      return NextResponse.json(
+        { error: "Too many promo code attempts. Please wait a few minutes and try again." },
+        { status: 429, headers: { "Retry-After": String(limited.retryAfterSeconds) } }
+      )
     }
 
     const body = await request.json()

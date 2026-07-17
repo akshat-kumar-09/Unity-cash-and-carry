@@ -6,6 +6,15 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, "New password must be at least 8 characters"),
 })
 
+export const requestPasswordResetSchema = z.object({
+  email: z.string().email(),
+})
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+})
+
 const isProductCategory = (c: string): c is ProductCategorySlug =>
   (PRODUCT_CATEGORY_SLUGS as readonly string[]).includes(c)
 

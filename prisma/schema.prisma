@@ -97,6 +97,11 @@ model Order {
   // VPD duty tracking
   vapeDutyAmount     Float @default(0.00)
   vatOnDuty          Float @default(0.00)
+  // Viva Wallet (Smart Checkout) payment tracking
+  paymentStatus      String    @default("unpaid") // unpaid, paid, failed
+  paymentMethod      String?   // "card" (Viva) | "wallet" (fully covered by wallet credits)
+  vivaOrderCode      String?   @unique
+  paidAt             DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   items         OrderItem[]
@@ -206,6 +211,14 @@ model SystemSetting {
 model InviteToken {
   token     String   @id
   email     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  token     String   @id
+  userId    String
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())

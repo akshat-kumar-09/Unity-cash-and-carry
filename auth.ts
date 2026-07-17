@@ -1,8 +1,13 @@
-import NextAuth, { type NextAuthConfig } from "next-auth"
+import NextAuth, { CredentialsSignin, type NextAuthConfig } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { loginSchema } from "@/lib/validations"
+import { rateLimit, getClientIp } from "@/lib/rate-limit"
+
+class RateLimitedSignin extends CredentialsSignin {
+  code = "rate_limited"
+}
 
 export const authConfig: NextAuthConfig = {
   trustHost: true,
@@ -13,7 +18,7 @@ export const authConfig: NextAuthConfig = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) {
           return null
         }
@@ -25,6 +30,15 @@ export const authConfig: NextAuthConfig = {
 
         if (!parsed.success) {
           return null
+        }
+
+        // Coarse per-IP cap guards against credential stuffing across many emails; the
+        // tighter per-IP+email cap stops repeated guesses at one account specifically.
+        const ip = getClientIp(request)
+        const perIp = rateLimit(`login:ip:${ip}`, 30, 10 * 60 * 1000)
+        const perAccount = rateLimit(`login:acct:${ip}:${parsed.data.email}`, 8, 10 * 60 * 1000)
+        if (!perIp.allowed || !perAccount.allowed) {
+          throw new RateLimitedSignin()
         }
 
         const user = await prisma.user.findUnique({

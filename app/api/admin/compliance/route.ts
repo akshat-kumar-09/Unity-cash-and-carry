@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import { Resend } from "resend"
 import crypto from "crypto"
+import { decryptSecret } from "@/lib/crypto"
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
@@ -93,9 +94,11 @@ export async function PATCH(request: NextRequest) {
     if (complianceStatus === "approved") {
       if (resend) {
         try {
-          // Extract temporary password from compliance notes
-          const match = user.complianceNotes?.match(/Generated Temp Password:\s*([^\s\n]+)/)
-          const tempPassword = match ? match[1] : null
+          // Extract temporary password from compliance notes — encrypted-at-rest going
+          // forward (see register route), but old rows may still have the plaintext form.
+          const match = user.complianceNotes?.match(/Generated Temp Password(?: \(encrypted\))?:\s*([^\s\n]+)/)
+          const isEncrypted = match ? /\(encrypted\)/.test(match[0]) : false
+          const tempPassword = match ? (isEncrypted ? decryptSecret(match[1]) : match[1]) : null
 
           if (tempPassword) {
             const portalUrl = process.env.APP_URL || "https://app.unitywholesale.co.uk"
@@ -160,6 +163,28 @@ export async function PATCH(request: NextRequest) {
               `,
             })
             console.log(`Compliance approval email sent successfully to ${user.email}`)
+
+            // Redact the (now-delivered) password from storage — no reason for it to
+            // keep sitting in the DB, encrypted or not, once the user has it.
+            if (match) {
+              const redactedNotes = user.complianceNotes!.replace(
+                match[0],
+                "Generated Temp Password: [REDACTED — emailed to user]"
+              )
+              const updated = await prisma.user.update({
+                where: { id: user.id },
+                data: { complianceNotes: redactedNotes },
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  complianceStatus: true,
+                  complianceNotes: true,
+                  priceTier: true,
+                },
+              })
+              return NextResponse.json(updated)
+            }
           }
         } catch (err) {
           console.error("Failed to send approval email via Resend:", err)

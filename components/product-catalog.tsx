@@ -33,32 +33,48 @@ function matchesSubcategory(
   subcategory: string,
   categorySlug: ProductCategorySlug
 ): boolean {
+  // productLine (e.g. "BB 4000 Kit", "Pulse Pods", "IVG Salts") is a more reliable signal
+  // than free-text name/SKU alone — fall back to name+SKU when it's not set.
+  const line = product.productLine ?? ""
+  const haystack = `${product.name} ${product.sku ?? ""} ${line}`
+
   if (categorySlug === "e_liquids") {
     if (subcategory === "Nic Salts") {
-      return /salt|nic|10ml|20mg/i.test(product.name + (product.sku ?? ""))
+      return /\bsalts?\b|\bnic\s*salt\b|\b20\s*mg\b/i.test(haystack)
     }
     if (subcategory === "Freebase") {
-      return /freebase|3mg|6mg|12mg/i.test(product.name + (product.sku ?? "")) || true
+      return /\bfreebase\b|\b(3|6|12)\s*mg\b/i.test(haystack)
     }
     if (subcategory === "Shortfills") {
-      return /short|50ml|100ml/i.test(product.name + (product.sku ?? "")) || true
+      return /\bshort\s*fill\w*\b|\b50\s*ml\b|\b100\s*ml\b/i.test(haystack)
     }
     if (subcategory === "Bar Salts") {
-      return /bar|disposable/i.test(product.name + (product.sku ?? "")) || true
+      return /\bbar\s*salts?\b|\bdisposable\b/i.test(haystack)
     }
     return true
   }
 
   if (categorySlug !== "vapes") return true
 
+  const isPodOrKitLine = /\bpods?\b|\bkit\b/i.test(line)
+  const isCompliant600 = /\b600\b/i.test(haystack) || /EB6|6\d{2}/i.test(product.sku ?? "")
+
   if (subcategory === "NEW Compliant 600 Puffs") {
-    return /600/i.test(product.name) || /600|EB6|6\d{2}/i.test(product.sku ?? "")
+    return isCompliant600
+  }
+  if (subcategory === "Pre-filled POD Systems") {
+    const isPrefilledPodLine = /\bpods?\b/i.test(line) && !/\bkit\b/i.test(line)
+    return isPrefilledPodLine || /\bpre[- ]?filled\s*pod/i.test(haystack)
+  }
+  if (subcategory === "Open POD Systems") {
+    const isRefillableKitLine = /\bkit\b/i.test(line) && !isCompliant600
+    return isRefillableKitLine || /\bopen\s*pod\b|\brefillable\b/i.test(haystack)
   }
   if (subcategory === "Big Puff Devices") {
-    return true
-  }
-  if (subcategory === "Pre-filled POD Systems" || subcategory === "Open POD Systems") {
-    return true
+    // High-puff disposables/rechargeables: 4+ digit puff counts or "10K"-style shorthand,
+    // excluding the compliant 600 line and anything already tagged as a kit/pod product line.
+    const hasBigPuffMarker = /\b\d{4,}\b|\b\d{1,2}k\b/i.test(haystack)
+    return hasBigPuffMarker && !isCompliant600 && !isPodOrKitLine
   }
   return true
 }
@@ -85,10 +101,6 @@ export function ProductCatalog({
   const [bulkModalOpen, setBulkModalOpen] = useState(false)
   const [selectedLine, setSelectedLine] = useState<string | null>(null)
   const [selectingAll, setSelectingAll] = useState(false)
-
-  const availableLines = (categorySlug === "vapes" || categorySlug === "e_liquids") && activeBrand !== "All"
-    ? PRODUCT_LINES_BY_BRAND[activeBrand]
-    : undefined
 
   const fetchPage = useCallback(async (pageNum: number, append: boolean) => {
     const params = new URLSearchParams()
@@ -168,32 +180,38 @@ export function ProductCatalog({
     return () => { cancelled = true }
   }, [activeBrand, search, refreshKey, categorySlug, subcategoryFilter])
 
-  const filtered = useMemo(() => {
+  // Everything except the productLine filter — this is what actually exists for the
+  // current category/brand/subcategory, and is what the line pills below should be
+  // derived from. Without this, PRODUCT_LINES_BY_BRAND (a flat per-brand list spanning
+  // every category, e.g. IVG's vape hardware lines AND its "IVG Salts" e-liquid line)
+  // showed every one of a brand's lines regardless of which category you're browsing,
+  // so most pills pointed at zero products (e.g. IVG's vape lines while under E-liquids).
+  const contextFiltered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    let list: Product[]
-    if (usingDemo) {
-      list = demoProducts.filter((p) => {
-        if (p.category !== categorySlug) return false
-        if (!matchesBrandFilter(p, activeBrand)) return false
-        if (!isAdmin && subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
-        if (selectedLine && p.productLine !== selectedLine) return false
-        if (q && !p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q)) return false
-        return true
-      })
-    } else {
-      list = products.filter((p) => {
-        if (p.category !== categorySlug) return false
-        if (!matchesBrandFilter(p, activeBrand)) return false
-        // Subcategory rules use heuristics on name/SKU; renaming can drop "600" etc. and hide the product.
-        // Admins need to see every product the API returned for this category/brand so edits don't "vanish".
-        if (!isAdmin && subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
-        if (selectedLine && p.productLine !== selectedLine) return false
-        if (q && !p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !(p.sku ?? "").toLowerCase().includes(q)) return false
-        return true
-      })
-    }
+    const source = usingDemo ? demoProducts : products
+    return source.filter((p) => {
+      if (p.category !== categorySlug) return false
+      if (!matchesBrandFilter(p, activeBrand)) return false
+      if (!isAdmin && subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
+      if (q && !p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !(p.sku ?? "").toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [products, usingDemo, activeBrand, search, subcategoryFilter, categorySlug, isAdmin])
+
+  const availableLines = useMemo(() => {
+    if (!((categorySlug === "vapes" || categorySlug === "e_liquids") && activeBrand !== "All")) return undefined
+    const knownOrder = PRODUCT_LINES_BY_BRAND[activeBrand] ?? []
+    const present = new Set(contextFiltered.map((p) => p.productLine).filter(Boolean))
+    const lines = knownOrder.filter((line) => present.has(line))
+    return lines.length > 0 ? lines : undefined
+  }, [categorySlug, activeBrand, contextFiltered])
+
+  const filtered = useMemo(() => {
+    const list = selectedLine
+      ? contextFiltered.filter((p) => p.productLine === selectedLine)
+      : contextFiltered
     return [...list].sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name))
-  }, [products, usingDemo, activeBrand, search, subcategoryFilter, selectedLine, categorySlug, isAdmin])
+  }, [contextFiltered, selectedLine])
 
   useEffect(() => {
     setSelectedIds([])

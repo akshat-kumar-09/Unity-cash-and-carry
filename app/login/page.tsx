@@ -80,7 +80,11 @@ function LoginPageContent() {
         redirect: false,
       })
       if (result?.error) {
-        setError("Invalid email or password. Please try again.")
+        setError(
+          result.code === "rate_limited"
+            ? "Too many sign-in attempts. Please wait a few minutes and try again."
+            : "Invalid email or password. Please try again."
+        )
         setLoading(false)
         return
       }
@@ -161,9 +165,14 @@ function LoginPageContent() {
               </div>
             </div>
             <div>
-              <label htmlFor="password" className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="password" className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Password
+                </label>
+                <a href="/forgot-password" className="text-xs font-bold text-blue-700 hover:text-blue-800">
+                  Forgot password?
+                </a>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input

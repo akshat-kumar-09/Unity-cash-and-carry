@@ -169,16 +169,35 @@ export function CartFooter() {
         throw new Error(err.error || "Failed to place order")
       }
 
-      setOrderPlaced(true)
-      setTimeout(() => {
-        clearCart()
-        closeCart()
-        setShowCheckoutForm(false)
-        setOrderPlaced(false)
-        setFormData(initialForm)
-        setAppliedPromo(null)
-        setUseWalletCredits(false)
-      }, 2500)
+      const order = await response.json()
+
+      // Wallet credits fully covered the order — nothing left to pay, show confirmation.
+      if (order.paymentStatus === "paid") {
+        setOrderPlaced(true)
+        setTimeout(() => {
+          clearCart()
+          closeCart()
+          setShowCheckoutForm(false)
+          setOrderPlaced(false)
+          setFormData(initialForm)
+          setAppliedPromo(null)
+          setUseWalletCredits(false)
+        }, 2500)
+        return
+      }
+
+      // Otherwise there's a balance to pay by card — hand off to Viva's hosted checkout.
+      // Cart is cleared now since the order already exists server-side; if payment is
+      // abandoned the order stays in "Orders" with a Pay Now button to retry.
+      clearCart()
+      const paymentRes = await fetch("/api/payments/viva/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      })
+      const paymentData = await paymentRes.json()
+      if (!paymentRes.ok) throw new Error(paymentData.error || "Failed to start payment")
+      window.location.href = paymentData.checkoutUrl
     } catch (error) {
       console.error("Error placing order:", error)
       setOrderPlaced(false)
@@ -197,7 +216,7 @@ export function CartFooter() {
     <>
       {/* Sticky Footer Bar — only when cart has items */}
       {totalItems > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-blue-700 border-t-2 border-blue-800/50 shadow-lg pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 bg-blue-700 border-t-2 border-blue-800/50 shadow-lg">
           <button
             type="button"
             onClick={openCart}
