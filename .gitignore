@@ -13,3 +13,8 @@ node_modules/
 # Database
 *.db
 *.db-journal
+.vercel
+.env*
+
+# Scratch screenshots for debugging with Claude — not part of the app
+screenshots/

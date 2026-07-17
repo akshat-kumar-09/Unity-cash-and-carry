@@ -41,6 +41,7 @@ type Order = {
   shippingAddress: string | null
   notes: string | null
   createdAt: string
+  paymentStatus: string
   items?: OrderItem[]
 }
 
@@ -72,7 +73,25 @@ export function OrdersView() {
   // UI States
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null)
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null)
   useBackHandler(invoiceOrder !== null, () => setInvoiceOrder(null))
+
+  const handlePayNow = async (order: Order) => {
+    setPayingOrderId(order.id)
+    try {
+      const res = await fetch("/api/payments/viva/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to start payment")
+      window.location.href = data.checkoutUrl
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to start payment")
+      setPayingOrderId(null)
+    }
+  }
 
   const fetchOrders = async (showToast = false) => {
     try {
@@ -247,7 +266,14 @@ export function OrdersView() {
                         <p className="text-[10.5px] font-semibold text-slate-400">
                           {formatDate(order.createdAt)}
                         </p>
-                        <StatusPill status={order.status} />
+                        <div className="flex items-center gap-1.5">
+                          {order.paymentStatus === "unpaid" && order.total > 0 && (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider text-red-600">
+                              Unpaid
+                            </span>
+                          )}
+                          <StatusPill status={order.status} />
+                        </div>
                       </div>
                     </div>
 
@@ -337,6 +363,19 @@ export function OrdersView() {
 
                       {/* Actions */}
                       <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+                        {order.paymentStatus === "unpaid" && order.total > 0 && (
+                          <button
+                            onClick={() => handlePayNow(order)}
+                            disabled={payingOrderId === order.id}
+                            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition-all hover:bg-red-700 active:scale-[0.98] disabled:opacity-50"
+                          >
+                            {payingOrderId === order.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>Pay £{order.total.toFixed(2)} Now</>
+                            )}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleQuickReorder(order)}
                           className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.98]"

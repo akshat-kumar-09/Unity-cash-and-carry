@@ -224,6 +224,9 @@ export async function POST(request: NextRequest) {
           promoCode: parsed.data.promoCode?.toUpperCase().trim() ?? null,
           discountAmount,
           walletCreditsUsed,
+          paymentStatus: total <= 0 ? "paid" : "unpaid",
+          paymentMethod: total <= 0 ? "wallet" : null,
+          paidAt: total <= 0 ? new Date() : null,
           items: {
             create: orderItems,
           },
