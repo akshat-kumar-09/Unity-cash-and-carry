@@ -49,6 +49,7 @@ async function getOrCreateWelcomePack() {
       casePrice: 0,
       isActive: true,
       isCatalogueVisible: false,
+      isGiftItem: true,
       stock: 999999,
       liquidVolumeMl: 0,
       isSubjectToVapeDuty: false,

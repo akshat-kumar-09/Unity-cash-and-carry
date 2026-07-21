@@ -75,6 +75,9 @@ model Product {
   /// welcome-build brochure) needs isActive=true (so it survives cart reload/checkout)
   /// but isCatalogueVisible=false (so it never shows up as a browsable product).
   isCatalogueVisible Boolean @default(true)
+  /// Marks a gift/free item (e.g. the welcome-build pack) so cart UI can special-case it —
+  /// e.g. not popping the sticky cart bar just because a gift landed in the cart.
+  isGiftItem         Boolean @default(false)
   stock         Int       @default(100)
   // VPD duty fields
   liquidVolumeMl      Float     @default(2.00)

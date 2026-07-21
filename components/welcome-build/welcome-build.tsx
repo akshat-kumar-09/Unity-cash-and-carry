@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { DeviceAssemblyGame } from "./device-assembly-game"
 import { TradePassReveal } from "./trade-pass-reveal"
+import { WelcomeGiftReveal } from "./welcome-gift-reveal"
 
 export type GiftContentItem = { name: string; value: number }
 type CompleteResult = {
@@ -24,18 +25,26 @@ type Props = {
 }
 
 export function WelcomeBuild({ companyName, name, vatNumber, approvedAt, onDone }: Props) {
-  const [stage, setStage] = useState<"game" | "reveal">("game")
+  const [stage, setStage] = useState<"game" | "reveal" | "gift">("game")
   const [completing, setCompleting] = useState(false)
+  const [result, setResult] = useState<CompleteResult | null>(null)
 
-  const handleContinue = async () => {
+  const handleContinueFromReveal = async () => {
     if (completing) return
     setCompleting(true)
     try {
       const res = await fetch("/api/onboarding/complete", { method: "POST" })
-      const data = res.ok ? await res.json() : null
-      onDone(data)
+      const data: CompleteResult | null = res.ok ? await res.json() : null
+      setResult(data)
+      if (data?.giftAdded && data.giftContents && data.giftContents.length > 0) {
+        setStage("gift")
+      } else {
+        onDone(data)
+      }
     } catch {
       onDone(null)
+    } finally {
+      setCompleting(false)
     }
   }
 
@@ -48,7 +57,15 @@ export function WelcomeBuild({ companyName, name, vatNumber, approvedAt, onDone 
           name={name}
           vatNumber={vatNumber}
           approvedAt={approvedAt}
-          onContinue={handleContinue}
+          onContinue={handleContinueFromReveal}
+        />
+      )}
+      {stage === "gift" && result?.giftContents && (
+        <WelcomeGiftReveal
+          giftProductName={result.giftProductName || "Welcome Pack"}
+          giftContents={result.giftContents}
+          giftValue={result.giftValue || 0}
+          onContinue={() => onDone(result)}
         />
       )}
     </div>

@@ -14,7 +14,9 @@ import {
   Clock,
   XCircle,
   Link2,
+  Sparkles,
 } from "lucide-react"
+import { toast } from "sonner"
 import { AppScreenHeader } from "@/components/app-screen-header"
 
 type Token = {
@@ -35,6 +37,8 @@ export function AdminSettingsView() {
   const [generatedLink, setGeneratedLink] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [copySuccess, setCopySuccess] = useState(false)
+  const [replayEmail, setReplayEmail] = useState("")
+  const [replaying, setReplaying] = useState(false)
 
   const fetchSettingsAndTokens = async () => {
     try {
@@ -120,6 +124,27 @@ export function AdminSettingsView() {
     }
   }
 
+  const handleReplayWelcome = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!replayEmail.trim()) return
+    setReplaying(true)
+    try {
+      const res = await fetch("/api/admin/settings/replay-welcome", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: replayEmail.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to reset welcome build")
+      toast.success(`${data.email} will see the welcome build again on their next login.`)
+      setReplayEmail("")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reset welcome build")
+    } finally {
+      setReplaying(false)
+    }
+  }
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     setCopySuccess(true)
@@ -202,6 +227,39 @@ export function AdminSettingsView() {
                   : "🔓 invite-only gateway is INACTIVE. Anyone can view the login screen directly."
                 }
               </div>
+            </div>
+
+            {/* Replay Welcome Build Card */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm p-5 space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-[15px] font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                  <Sparkles className="h-4.5 w-4.5 text-blue-600" />
+                  Replay Welcome Build
+                </h3>
+                <p className="text-slate-500 text-[11px] font-semibold leading-relaxed">
+                  Resets a retailer&apos;s onboarding so the welcome build (puzzle, Trade Pass, gift
+                  reveal) plays again the next time they log in — handy for demos.
+                </p>
+              </div>
+
+              <form onSubmit={handleReplayWelcome} className="flex gap-2">
+                <input
+                  type="email"
+                  placeholder="retailer@business.com"
+                  value={replayEmail}
+                  onChange={(e) => setReplayEmail(e.target.value)}
+                  className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[12px] font-semibold text-slate-800 focus:border-blue-500 focus:outline-none shadow-sm placeholder:text-slate-400"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={replaying}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] uppercase tracking-wider py-2.5 px-4 rounded-xl transition-all active:scale-[0.97] shadow-sm disabled:opacity-50 shrink-0 flex items-center gap-1"
+                >
+                  {replaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  Replay
+                </button>
+              </form>
             </div>
 
             {/* Invite Token Generator Card */}

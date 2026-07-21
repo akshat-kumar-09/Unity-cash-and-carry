@@ -31,9 +31,12 @@ export function TradePassReveal({ companyName, name, vatNumber, approvedAt, onCo
 
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-8 px-6 py-10 text-center">
-      <p className={`text-lg font-bold text-white transition-opacity duration-500 ${showCard ? "opacity-100" : "opacity-0"}`}>
-        This is your Unity card.
-      </p>
+      <div className={`transition-opacity duration-500 ${showCard ? "opacity-100" : "opacity-0"}`}>
+        <p className="text-lg font-bold text-white">
+          Welcome to the Unity App, {companyName || "partner"}.
+        </p>
+        <p className="mt-1 text-sm font-semibold text-white/70">This is your Unity card.</p>
+      </div>
 
       <div className={`w-full max-w-sm transition-all duration-500 ${showCard ? "opacity-100 scale-100" : "opacity-0 scale-90"}`}>
         <TradeIdCard companyName={companyName} name={name} vatNumber={vatNumber} approvedAt={approvedAt} animateStamp={showStamp} />

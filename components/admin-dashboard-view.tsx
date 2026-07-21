@@ -22,6 +22,7 @@ import {
   TrendingDown,
   ArrowRight,
   Settings,
+  Tag,
 } from "lucide-react"
 import { AppScreenHeader } from "@/components/app-screen-header"
 
@@ -31,6 +32,7 @@ export type AdminSection =
   | "leads"
   | "routes"
   | "compliance"
+  | "pricing"
   | "reports"
   | "settings"
 
@@ -51,6 +53,7 @@ const NAV_ITEMS: { key: AdminSection; label: string; icon: React.ElementType }[]
   { key: "leads", label: "Leads", icon: Users },
   { key: "routes", label: "Routes", icon: MapPin },
   { key: "compliance", label: "Compliance", icon: ShieldCheck },
+  { key: "pricing", label: "Pricing", icon: Tag },
   { key: "reports", label: "Reports", icon: FileBarChart },
   { key: "settings", label: "Settings", icon: Settings },
 ]

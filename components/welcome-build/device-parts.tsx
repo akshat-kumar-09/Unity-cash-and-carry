@@ -27,6 +27,7 @@ const PAD = TAB_BULGE + 3
  *  for visual variety, either polarity interlocks correctly. */
 const BOUNDARY_DIR = [1, -1, 1, -1]
 
+
 /** Mouthpiece taper — shared by BOTH the last puzzle piece and the solved-image outline
  *  (see piecePathD's isLast branch and deviceOutlinePath below), so what gets assembled
  *  is pixel-identical to the finished picture, not a plain flush rectangle that only

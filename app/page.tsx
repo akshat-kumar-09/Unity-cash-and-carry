@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
-import { redirect } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { AppBottomNav, type AppTab } from "@/components/app-bottom-nav"
 import { ShopView } from "@/components/shop-view"
 import { OrdersView } from "@/components/orders-view"
@@ -18,10 +18,10 @@ import { AdminWarehouseView } from "@/components/admin-warehouse-view"
 import { AdminLeadsView } from "@/components/admin-leads-view"
 import { AdminRoutePlannerView } from "@/components/admin-route-planner-view"
 import { AdminComplianceView } from "@/components/admin-compliance-view"
+import { AdminPricingView } from "@/components/admin-pricing-view"
 import { AdminReportsView } from "@/components/admin-reports-view"
 import { AdminSettingsView } from "@/components/admin-settings-view"
-import { WelcomeBuild, type GiftContentItem } from "@/components/welcome-build/welcome-build"
-import { WelcomeGiftPopup } from "@/components/welcome-build/welcome-gift-popup"
+import { WelcomeBuild } from "@/components/welcome-build/welcome-build"
 
 type OnboardingProfile = {
   name: string | null
@@ -31,13 +31,7 @@ type OnboardingProfile = {
   welcomeGameCompletedAt: string | null
 }
 
-type PendingGift = {
-  productName: string
-  contents: GiftContentItem[]
-  value: number
-}
-
-export type AdminSection = "dashboard" | "warehouse" | "leads" | "routes" | "compliance" | "reports" | "settings"
+export type AdminSection = "dashboard" | "warehouse" | "leads" | "routes" | "compliance" | "pricing" | "reports" | "settings"
 
 function AdminView() {
   const [section, setSection] = useState<AdminSection>("dashboard")
@@ -65,6 +59,11 @@ function AdminView() {
       {section === "compliance" && (
         <AdminDashboardView activeSection={section} onSectionChange={setSection}>
           <AdminComplianceView />
+        </AdminDashboardView>
+      )}
+      {section === "pricing" && (
+        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
+          <AdminPricingView />
         </AdminDashboardView>
       )}
       {section === "reports" && (
@@ -129,10 +128,9 @@ function AppShell() {
 
 function HomeContent() {
   const { data: session, status } = useSession()
+  const router = useRouter()
   const [profile, setProfile] = useState<OnboardingProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
-  const [pendingGift, setPendingGift] = useState<PendingGift | null>(null)
-
   useEffect(() => {
     if (status !== "authenticated") return
     fetch("/api/account/profile")
@@ -141,6 +139,15 @@ function HomeContent() {
       .catch(() => setProfile(null))
       .finally(() => setProfileLoading(false))
   }, [status])
+
+  // Client Component navigation belongs in an effect, not a render-time redirect() call —
+  // during sign-out's session-state transition, a render-time redirect() was getting caught
+  // by the error boundary instead of the router (the "sign out -> error page" bug).
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login")
+    }
+  }, [status, router])
 
   if (status === "loading" || (status === "authenticated" && profileLoading)) {
     return (
@@ -153,7 +160,13 @@ function HomeContent() {
   }
 
   if (!session) {
-    redirect("/login")
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-slate-100">
+        <div className="animate-pulse text-slate-500 font-mono text-sm uppercase tracking-wider">
+          Loading...
+        </div>
+      </div>
+    )
   }
 
   const role = (session.user as { role?: string })?.role
@@ -170,15 +183,8 @@ function HomeContent() {
         name={profile.name}
         vatNumber={profile.vatNumber}
         approvedAt={profile.approvedAt}
-        onDone={(result) => {
+        onDone={() => {
           setProfile((p) => (p ? { ...p, welcomeGameCompletedAt: new Date().toISOString() } : p))
-          if (result?.giftAdded && result.giftProductName) {
-            setPendingGift({
-              productName: result.giftProductName,
-              contents: result.giftContents || [],
-              value: result.giftValue || 0,
-            })
-          }
         }}
       />
     )
@@ -188,14 +194,6 @@ function HomeContent() {
     <TradeProvider isAdmin={isAdmin} tradeCode="">
       <CartProvider>
         <AppShell />
-        {pendingGift && (
-          <WelcomeGiftPopup
-            giftProductName={pendingGift.productName}
-            giftContents={pendingGift.contents}
-            giftValue={pendingGift.value}
-            onClose={() => setPendingGift(null)}
-          />
-        )}
       </CartProvider>
     </TradeProvider>
   )

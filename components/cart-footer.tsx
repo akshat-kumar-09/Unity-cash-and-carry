@@ -125,6 +125,11 @@ export function CartFooter() {
   const creditsToUse = useWalletCredits ? Math.min(walletBalance, preWalletTotal) : 0
   const finalTotal = Math.round((preWalletTotal - creditsToUse) * 100) / 100
 
+  // Gift items (e.g. the welcome-build pack) shouldn't pop the sticky bar on their own —
+  // it should only appear once the retailer has actually added a real product. The gift
+  // still shows normally inside the full cart drawer once opened.
+  const hasRealItems = items.some((i) => !i.product.isGiftItem)
+
   if (totalItems === 0 && !isCartOpen) return null
 
   const handlePlaceOrderClick = () => {
@@ -216,8 +221,8 @@ export function CartFooter() {
 
   return (
     <>
-      {/* Sticky Footer Bar — only when cart has items */}
-      {totalItems > 0 && (
+      {/* Sticky Footer Bar — only once a real (non-gift) product is in the cart */}
+      {hasRealItems && (
         <div
           className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 bg-blue-700 border-t-2 border-blue-800/50 shadow-lg ${
             cartPulsing ? "animate-cart-pulse" : ""

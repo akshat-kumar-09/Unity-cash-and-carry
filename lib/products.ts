@@ -48,6 +48,8 @@ export type Product = {
   liquidVolumeMl?: number
   isSubjectToVapeDuty?: boolean
   nicotineStrengthMg?: number
+  /** Free/gift item (e.g. the welcome-build pack) — cart UI special-cases these. */
+  isGiftItem?: boolean
 }
 
 const CATEGORY_IMAGES: Record<string, string> = {
