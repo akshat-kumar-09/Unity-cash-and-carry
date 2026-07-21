@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { X, Plus } from "lucide-react"
 import { categories } from "@/lib/products"
+import { PRODUCT_LINES_BY_BRAND } from "@/lib/product-categories"
 
 const CATEGORIES = categories.map((c) => c.key)
 
@@ -21,6 +22,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
     description: "",
     brand: "",
     category: "vapes",
+    productLine: "",
     sku: "",
     packLabel: "",
     unitsPerPack: 10,
@@ -63,6 +65,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
       const payload = {
         ...form,
         description: form.description.trim(),
+        productLine: form.productLine.trim() || undefined,
         badge: form.badge.trim() || undefined,
         imageUrl: form.imageUrl.trim() || undefined,
         unitPriceA: form.unitPriceA > 0 ? form.unitPriceA : undefined,
@@ -82,6 +85,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
         description: "",
         brand: "",
         category: "vapes",
+        productLine: "",
         sku: "",
         packLabel: "",
         unitsPerPack: 10,
@@ -186,6 +190,26 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Product line (vapes/e-liquids)</label>
+            <input
+              name="productLine"
+              list="product-line-suggestions"
+              value={form.productLine}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-slate-200 rounded text-sm"
+              placeholder="e.g. BB 4000 Kit, Pulse Pods, Higo Salts"
+              autoComplete="off"
+            />
+            <datalist id="product-line-suggestions">
+              {(PRODUCT_LINES_BY_BRAND[form.brand] ?? []).map((line) => (
+                <option key={line} value={line} />
+              ))}
+            </datalist>
+            <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+              Groups flavours under this line in the shop&apos;s brand drilldown (e.g. Higo → Pulse Pods → flavours). Leave blank for non-vape/e-liquid categories.
+            </p>
           </div>
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">SKU (optional)</label>

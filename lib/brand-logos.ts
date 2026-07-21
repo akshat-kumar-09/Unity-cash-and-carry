@@ -22,6 +22,11 @@ export const BRAND_LOGO_REMOTE_URLS: Record<string, string> = {
   "elf-bar": "https://www.elfbar.co.uk/media/logo/stores/9/elfbar-logo-new-200.webp",
   "lost-mary": "https://www.lostmary.co.uk/media/logo/stores/10/lost-mary-logo.png",
   ske: "https://www.skecrystalbar.com/media/logo/stores/11/ske-logo.png",
+  // Verified reachable (curl 200, image/png) 2026-07-21. The rest of the pouch/papers
+  // roster (Killa, Pablo, Velo, Rizla, RAW, Swan, Clipper) couldn't be resolved to a
+  // real logo asset via automated lookup — see /public/brands/README.txt to drop local
+  // files for those instead; BrandMark falls back to an initials badge until then.
+  "nordic-spirit": "https://nordicspirit.co.uk/media/logo/stores/1/_logotype.png",
 }
 
 /** Official Elf Bar artwork is on black — match with a dark tile in lists */

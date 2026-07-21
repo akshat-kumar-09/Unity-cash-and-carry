@@ -34,14 +34,6 @@ export type ProductCategorySlug = (typeof PRODUCT_CATEGORY_SLUGS)[number]
 
 export const productCategoryEnumList = [...PRODUCT_CATEGORY_SLUGS] as [string, ...string[]]
 
-/** Categories that browse with category only (no brand ladder). */
-export const SIMPLE_BROWSE_SLUGS: readonly ProductCategorySlug[] = [
-  "papers",
-  "filters",
-  "lighters_fire",
-  "other",
-]
-
 /** Nicotine pouch brands — flat brand picker (no subcategory ladder like vapes). */
 export const POUCH_BRANDS = ["Killa", "Nordic Spirit", "Pablo", "Velo"] as const
 export type PouchBrand = (typeof POUCH_BRANDS)[number]
@@ -54,14 +46,15 @@ export type ShopCategoryDef = {
   /** Short keyword line for tiles — not full sentences */
   keywords: string
   status: ShopCategoryStatus
-  /** Uses subcategory → brand drill-down in shop */
-  drilldown: "vape_style" | "brand_only" | "none"
+  /** Shop drill-down shape: brand_then_line = brand → product line → flavours (vapes/e-liquids);
+   *  brand_only = brand → flavours directly (no line ladder); none = flat product grid. */
+  drilldown: "brand_then_line" | "brand_only" | "none"
 }
 
 /** Full shop IA: order = display order (papers / filters / lighters / other last) */
 export const SHOP_CATEGORIES: ShopCategoryDef[] = [
-  { id: "vapes", label: "Vaping", keywords: "Disposables • pods • kits • hardware", status: "active", drilldown: "vape_style" },
-  { id: "e_liquids", label: "E-liquids", keywords: "Salts • freebase • shortfills • bar salts", status: "active", drilldown: "vape_style" },
+  { id: "vapes", label: "Vaping", keywords: "Disposables • pods • kits • hardware", status: "active", drilldown: "brand_then_line" },
+  { id: "e_liquids", label: "E-liquids", keywords: "Nic salts • by brand", status: "active", drilldown: "brand_then_line" },
   { id: "nicotine_pouches", label: "Nicotine pouches", keywords: "Snus • white pouches • nic pods", status: "active", drilldown: "brand_only" },
   { id: "cbd_hemp", label: "CBD & hemp", keywords: "Oils • edibles • legal UK", status: "coming_soon", drilldown: "none" },
   { id: "limited_editions", label: "Limited editions", keywords: "Drops • exclusives • collabs", status: "coming_soon", drilldown: "none" },
@@ -80,27 +73,11 @@ export const SHOP_CATEGORIES: ShopCategoryDef[] = [
   { id: "gift_sets", label: "Gift sets", keywords: "Bundles • retail packs", status: "coming_soon", drilldown: "none" },
   { id: "bundles", label: "Bundles", keywords: "Multi-buy • case deals", status: "coming_soon", drilldown: "none" },
   { id: "clearance", label: "Clearance", keywords: "Reduced • last chance", status: "coming_soon", drilldown: "none" },
-  { id: "papers", label: "Papers", keywords: "Rolling • king • slim", status: "active", drilldown: "none" },
-  { id: "filters", label: "Filters", keywords: "Tips • slim • carbon", status: "active", drilldown: "none" },
-  { id: "lighters_fire", label: "Lighters & fire", keywords: "Torch • classic • impulse", status: "active", drilldown: "none" },
-  { id: "other", label: "Other", keywords: "Catch-all • misc • spare parts", status: "active", drilldown: "none" },
+  { id: "papers", label: "Papers", keywords: "Rolling • king • slim", status: "active", drilldown: "brand_only" },
+  { id: "filters", label: "Filters", keywords: "Tips • slim • carbon", status: "active", drilldown: "brand_only" },
+  { id: "lighters_fire", label: "Lighters & fire", keywords: "Torch • classic • impulse", status: "active", drilldown: "brand_only" },
+  { id: "other", label: "Other", keywords: "Catch-all • misc • spare parts", status: "active", drilldown: "brand_only" },
 ]
-
-/** Subcats under hardware vaping (E-liquids split out to top-level). */
-export const VAPING_SUBCATEGORIES = [
-  "Big Puff Devices",
-  "NEW Compliant 600 Puffs",
-  "Pre-filled POD Systems",
-  "Open POD Systems",
-] as const
-
-/** E-liquid section names — same brand ladder as vaping */
-export const E_LIQUID_SUBCATEGORIES = [
-  "Nic Salts",
-  "Freebase",
-  "Shortfills",
-  "Bar Salts",
-] as const
 
 export const VAPING_BRANDS = [
   "Higo",

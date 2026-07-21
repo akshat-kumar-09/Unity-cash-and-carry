@@ -20,6 +20,22 @@ import { AdminRoutePlannerView } from "@/components/admin-route-planner-view"
 import { AdminComplianceView } from "@/components/admin-compliance-view"
 import { AdminReportsView } from "@/components/admin-reports-view"
 import { AdminSettingsView } from "@/components/admin-settings-view"
+import { WelcomeBuild, type GiftContentItem } from "@/components/welcome-build/welcome-build"
+import { WelcomeGiftPopup } from "@/components/welcome-build/welcome-gift-popup"
+
+type OnboardingProfile = {
+  name: string | null
+  companyName: string | null
+  vatNumber: string | null
+  approvedAt: string | null
+  welcomeGameCompletedAt: string | null
+}
+
+type PendingGift = {
+  productName: string
+  contents: GiftContentItem[]
+  value: number
+}
 
 export type AdminSection = "dashboard" | "warehouse" | "leads" | "routes" | "compliance" | "reports" | "settings"
 
@@ -113,8 +129,20 @@ function AppShell() {
 
 function HomeContent() {
   const { data: session, status } = useSession()
+  const [profile, setProfile] = useState<OnboardingProfile | null>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
+  const [pendingGift, setPendingGift] = useState<PendingGift | null>(null)
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (status !== "authenticated") return
+    fetch("/api/account/profile")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setProfile(data))
+      .catch(() => setProfile(null))
+      .finally(() => setProfileLoading(false))
+  }, [status])
+
+  if (status === "loading" || (status === "authenticated" && profileLoading)) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-slate-100">
         <div className="animate-pulse text-slate-500 font-mono text-sm uppercase tracking-wider">
@@ -128,12 +156,46 @@ function HomeContent() {
     redirect("/login")
   }
 
-  const isAdmin = (session.user as { role?: string })?.role === "admin"
+  const role = (session.user as { role?: string })?.role
+  const isAdmin = role === "admin"
+  // The welcome build is a retailer's first-login moment — admin/rep accounts (internal
+  // tooling logins, not onboarded trade partners) skip it entirely.
+  const isRetailer = role === "customer" || role === "trader"
+  const needsWelcomeBuild = isRetailer && profile != null && !profile.welcomeGameCompletedAt
+
+  if (needsWelcomeBuild && profile) {
+    return (
+      <WelcomeBuild
+        companyName={profile.companyName || ""}
+        name={profile.name}
+        vatNumber={profile.vatNumber}
+        approvedAt={profile.approvedAt}
+        onDone={(result) => {
+          setProfile((p) => (p ? { ...p, welcomeGameCompletedAt: new Date().toISOString() } : p))
+          if (result?.giftAdded && result.giftProductName) {
+            setPendingGift({
+              productName: result.giftProductName,
+              contents: result.giftContents || [],
+              value: result.giftValue || 0,
+            })
+          }
+        }}
+      />
+    )
+  }
 
   return (
     <TradeProvider isAdmin={isAdmin} tradeCode="">
       <CartProvider>
         <AppShell />
+        {pendingGift && (
+          <WelcomeGiftPopup
+            giftProductName={pendingGift.productName}
+            giftContents={pendingGift.contents}
+            giftValue={pendingGift.value}
+            onClose={() => setPendingGift(null)}
+          />
+        )}
       </CartProvider>
     </TradeProvider>
   )

@@ -92,7 +92,7 @@ export function getEffectiveMaxQtyPerOrder(product: { maxQtyPerOrder?: number | 
   return Math.max(1, Math.min(99999, Math.floor(Number(n))))
 }
 
-export function matchesBrandFilter(product: Product, filter: BrandFilter): boolean {
+export function matchesBrandFilter(product: Product, filter: string): boolean {
   if (filter === "All") return true
   if (filter === "Accessories") return accessoryBrands.includes(product.brand)
   return product.brand === filter

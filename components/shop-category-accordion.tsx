@@ -1,188 +1,130 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
   Sparkles,
 } from "lucide-react"
-import type { BrandFilter } from "@/lib/products"
 import {
   SHOP_CATEGORIES,
-  VAPING_SUBCATEGORIES,
-  E_LIQUID_SUBCATEGORIES,
   VAPING_BRANDS,
   POUCH_BRANDS,
-  brandInitials,
   type ProductCategorySlug,
 } from "@/lib/product-categories"
-import {
-  brandLogoPrefersDarkTile,
-  brandSlug,
-  getBrandLogoCandidates,
-} from "@/lib/brand-logos"
+import { BrandLinePicker } from "@/components/brand-line-picker"
+import { FlavourQuickAddList } from "@/components/flavour-quick-add-list"
+import { BrandMark } from "@/components/brand-mark"
 
+/** Only simple-browse categories (papers/filters/lighters/other) still leave the
+ *  accordion — everything brand-driven (vapes/e-liquids/pouches) now expands inline. */
 export type ShopNavigatePayload = {
   categorySlug: ProductCategorySlug
-  subcategory: string | null
-  brand: BrandFilter | null
 }
 
 type ShopCategoryAccordionProps = {
   onNavigate: (payload: ShopNavigatePayload) => void
-}
-
-/** Fixed slot + object-contain so tall/wide/wordmark assets align in the brand list */
-const LOGO_SHELL =
-  "flex h-11 w-[5rem] shrink-0 items-center justify-center overflow-hidden rounded-xl border shadow-sm sm:w-[5.5rem]"
-
-function BrandMark({ brand }: { brand: BrandFilter }) {
-  const slug = brandSlug(brand)
-  const candidates = getBrandLogoCandidates(brand)
-  const [idx, setIdx] = useState(0)
-  const darkTile = brandLogoPrefersDarkTile(slug)
-
-  if (idx >= candidates.length) {
-    return (
-      <span
-        className={`${LOGO_SHELL} border-blue-200/90 bg-blue-50 text-[10px] font-bold text-blue-800 ring-1 ring-blue-200/70`}
-      >
-        {brandInitials(brand)}
-      </span>
-    )
-  }
-
-  const src = candidates[idx]
-  const tile =
-    darkTile
-      ? "border-neutral-700/90 bg-neutral-950 ring-1 ring-black/25"
-      : "border-slate-200/80 bg-white ring-1 ring-slate-200/70"
-
-  return (
-    <span className={`${LOGO_SHELL} ${tile}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt=""
-        className={`h-full w-full max-h-[2.75rem] object-contain p-1 ${darkTile ? "brightness-[1.02]" : ""}`}
-        onError={() => setIdx((i) => i + 1)}
-      />
-    </span>
-  )
+  search: string
 }
 
 function BrandRow({
   brand,
+  expanded,
   onSelect,
 }: {
-  brand: BrandFilter
+  brand: string
+  expanded: boolean
   onSelect: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
-      className="unity-tap group flex w-full items-center gap-2.5 border-b border-blue-100/90 bg-white/80 px-3 py-2 text-left transition last:border-b-0 hover:bg-blue-50/60 active:bg-blue-50"
+      aria-expanded={expanded}
+      className={`unity-tap group flex w-full items-center gap-3 border-b border-blue-100 px-3 py-3 text-left transition hover:bg-blue-50/60 active:bg-blue-50 ${
+        expanded
+          ? "bg-blue-50/80"
+          : "bg-gradient-to-br from-white via-blue-50/30 to-white shop-vape-stripes"
+      }`}
     >
       <BrandMark brand={brand} />
-      <span className="min-w-0 flex-1 text-[13px] font-semibold tracking-tight text-blue-700 group-hover:text-blue-800">
+      <span className="min-w-0 flex-1 text-[15px] font-bold tracking-tight text-blue-700 group-hover:text-blue-800">
         {brand}
       </span>
-      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-blue-400 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
+      {expanded ? (
+        <ChevronUp className="h-4 w-4 shrink-0 text-blue-500" />
+      ) : (
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-blue-400 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
+      )}
     </button>
   )
 }
 
-function VapeStyleCategoryCard({
-  def,
-  subcategories,
-  defaultOpen = true,
-  onPickBrand,
-}: {
-  def: (typeof SHOP_CATEGORIES)[number]
-  subcategories: readonly string[]
-  defaultOpen?: boolean
-  onPickBrand: (subcategory: string, brand: BrandFilter) => void
-}) {
-  const [expanded, setExpanded] = useState(defaultOpen)
-  const [openSub, setOpenSub] = useState<string | null>(subcategories[0] ?? null)
+/** Category card that expands to a flat brand list; tapping a brand expands it
+ *  in-place (single-open, like the category card itself) to reveal either the brand's
+ *  product lines (vapes/e-liquids) or its flavours directly (nicotine pouches) —
+ *  no screen navigation, all within this same scrolling accordion. */
+/** Categories without a fixed brand roster (papers/filters/lighters/other) derive
+ *  their brand list from whatever's actually live in the catalogue for that
+ *  category, fetched once the card is first expanded — same lazy-load shape as the
+ *  line picker uses for product lines, so a new brand shows up automatically the
+ *  moment admin adds stock under it, with no taxonomy file to keep in sync. */
+function useDynamicBrands(categorySlug: string, enabled: boolean) {
+  const [brands, setBrands] = useState<string[] | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-dashed border-blue-300/80 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className="unity-tap flex w-full items-center justify-between px-3.5 py-3 text-left"
-        aria-expanded={expanded}
-      >
-        <div>
-          <span className="text-[13px] font-bold uppercase tracking-wider text-blue-600">
-            {def.label}
-          </span>
-          <p className="mt-0.5 text-[10px] font-medium leading-snug text-blue-600/75">
-            {def.keywords}
-          </p>
-        </div>
-        {expanded ? (
-          <ChevronUp className="h-4 w-4 shrink-0 text-blue-500" />
-        ) : (
-          <ChevronDown className="h-4 w-4 shrink-0 text-blue-500" />
-        )}
-      </button>
-      {expanded && (
-        <div className="space-y-2 border-t border-dashed border-blue-200/80 px-2.5 pb-2.5 pt-2">
-          {subcategories.map((sub) => {
-            const isOpen = openSub === sub
-            return (
-              <div
-                key={sub}
-                className="overflow-hidden rounded-xl border border-dashed border-blue-200/70 bg-white/70"
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpenSub(isOpen ? null : sub)}
-                  className="unity-tap flex w-full items-center justify-between px-3 py-2 text-left"
-                >
-                  <span className="text-[12px] font-semibold text-blue-600">{sub}</span>
-                  {isOpen ? (
-                    <ChevronUp className="h-4 w-4 shrink-0 text-blue-400" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 shrink-0 text-blue-400" />
-                  )}
-                </button>
-                {isOpen && (
-                  <div className="border-t border-dashed border-blue-100/90 px-1 pb-1 pt-0.5">
-                    <div className="overflow-hidden rounded-lg border border-blue-100/80 bg-white/90">
-                      {VAPING_BRANDS.map((brand) => (
-                        <BrandRow
-                          key={`${sub}-${brand}`}
-                          brand={brand}
-                          onSelect={() => onPickBrand(sub, brand)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
+  useEffect(() => {
+    if (!enabled || brands !== null) return
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams()
+        params.set("category", categorySlug)
+        params.set("limit", "100")
+        const res = await fetch(`/api/products?${params.toString()}`)
+        const data = await res.json()
+        if (cancelled) return
+        const set = new Set<string>()
+        for (const p of Array.isArray(data?.products) ? data.products : []) {
+          if (p?.brand) set.add(p.brand)
+        }
+        setBrands([...set].sort())
+      } catch {
+        if (!cancelled) setBrands([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [categorySlug, enabled, brands])
+
+  return { brands: brands ?? [], loading }
 }
 
-function BrandOnlyCategoryCard({
+function BrandDrilldownCard({
   def,
-  brands,
-  onPickBrand,
+  brands: staticBrands,
+  mode,
+  defaultOpen = false,
+  search,
 }: {
   def: (typeof SHOP_CATEGORIES)[number]
-  brands: readonly BrandFilter[]
-  onPickBrand: (brand: BrandFilter) => void
+  /** Omit to derive the brand list live from the catalogue instead of a fixed roster. */
+  brands?: readonly string[]
+  mode: "brand_then_line" | "brand_only"
+  defaultOpen?: boolean
+  search: string
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultOpen)
+  const [openBrand, setOpenBrand] = useState<string | null>(null)
+  const { brands: dynamicBrands, loading: loadingBrands } = useDynamicBrands(
+    def.id,
+    !staticBrands && expanded
+  )
+  const brands = staticBrands ?? dynamicBrands
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-dashed border-blue-300/80 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner">
@@ -208,10 +150,41 @@ function BrandOnlyCategoryCard({
       </button>
       {expanded && (
         <div className="border-t border-dashed border-blue-200/80 px-2.5 pb-2.5 pt-2">
-          <div className="overflow-hidden rounded-lg border border-blue-100/80 bg-white/90">
-            {brands.map((brand) => (
-              <BrandRow key={brand} brand={brand} onSelect={() => onPickBrand(brand)} />
-            ))}
+          <div className="overflow-hidden rounded-2xl border border-blue-200/70 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner">
+            {loadingBrands && brands.length === 0 && (
+              <div className="px-3 py-3 text-center">
+                <div className="inline-flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-200 border-t-blue-500" />
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-blue-500/80">Loading brands…</p>
+                </div>
+              </div>
+            )}
+            {!loadingBrands && brands.length === 0 && (
+              <p className="px-3 py-3 text-center text-[11px] font-semibold text-slate-400">
+                No brands live yet in this section.
+              </p>
+            )}
+            {brands.map((brand) => {
+              const isOpen = openBrand === brand
+              return (
+                <div key={brand}>
+                  <BrandRow
+                    brand={brand}
+                    expanded={isOpen}
+                    onSelect={() => setOpenBrand(isOpen ? null : brand)}
+                  />
+                  {isOpen && (
+                    mode === "brand_only" ? (
+                      <div className="border-t border-dashed border-blue-100/90 p-1.5">
+                        <FlavourQuickAddList categorySlug={def.id} brand={brand} search={search} />
+                      </div>
+                    ) : (
+                      <BrandLinePicker categorySlug={def.id} brand={brand} search={search} />
+                    )
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -277,7 +250,7 @@ function ComingSoonTile({
   )
 }
 
-export function ShopCategoryAccordion({ onNavigate }: ShopCategoryAccordionProps) {
+export function ShopCategoryAccordion({ onNavigate, search }: ShopCategoryAccordionProps) {
   return (
     <div className="space-y-3 px-3 pb-28 pt-2">
       {SHOP_CATEGORIES.map((cat) => {
@@ -291,55 +264,27 @@ export function ShopCategoryAccordion({ onNavigate }: ShopCategoryAccordionProps
           )
         }
 
-        if (cat.drilldown === "vape_style" && cat.id === "vapes") {
+        if (cat.drilldown === "brand_then_line") {
           return (
-            <VapeStyleCategoryCard
+            <BrandDrilldownCard
               key={cat.id}
               def={cat}
-              subcategories={VAPING_SUBCATEGORIES}
-              defaultOpen
-              onPickBrand={(sub, brand) =>
-                onNavigate({
-                  categorySlug: "vapes",
-                  subcategory: sub,
-                  brand,
-                })
-              }
-            />
-          )
-        }
-
-        if (cat.drilldown === "vape_style" && cat.id === "e_liquids") {
-          return (
-            <VapeStyleCategoryCard
-              key={cat.id}
-              def={cat}
-              subcategories={E_LIQUID_SUBCATEGORIES}
-              defaultOpen={false}
-              onPickBrand={(sub, brand) =>
-                onNavigate({
-                  categorySlug: "e_liquids",
-                  subcategory: sub,
-                  brand,
-                })
-              }
+              brands={VAPING_BRANDS}
+              mode="brand_then_line"
+              defaultOpen={cat.id === "vapes"}
+              search={search}
             />
           )
         }
 
         if (cat.drilldown === "brand_only") {
           return (
-            <BrandOnlyCategoryCard
+            <BrandDrilldownCard
               key={cat.id}
               def={cat}
-              brands={POUCH_BRANDS}
-              onPickBrand={(brand) =>
-                onNavigate({
-                  categorySlug: cat.id,
-                  subcategory: null,
-                  brand,
-                })
-              }
+              brands={cat.id === "nicotine_pouches" ? POUCH_BRANDS : undefined}
+              mode="brand_only"
+              search={search}
             />
           )
         }
@@ -349,13 +294,7 @@ export function ShopCategoryAccordion({ onNavigate }: ShopCategoryAccordionProps
             key={cat.id}
             label={cat.label}
             keywords={cat.keywords}
-            onSelect={() =>
-              onNavigate({
-                categorySlug: cat.id,
-                subcategory: null,
-                brand: "All",
-              })
-            }
+            onSelect={() => onNavigate({ categorySlug: cat.id })}
           />
         )
       })}

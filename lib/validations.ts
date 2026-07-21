@@ -27,6 +27,8 @@ const productFields = {
     .max(8000),
   brand: z.string().min(1),
   category: z.string().refine(isProductCategory, 'Invalid category'),
+  /** Real per-brand product line (e.g. "BB 4000 Kit", "Higo Salts") — drives the shop's brand→line drilldown for vapes/e-liquids. Null/omitted for categories without a line ladder. */
+  productLine: z.string().trim().max(120).optional().nullable(),
   /** Omitted or blank → server assigns an auto SKU */
   sku: z.string().min(1).max(64).optional(),
   packLabel: z.string().min(1),
@@ -107,6 +109,8 @@ export const updateProductSchema = z
       .max(8000)
       .optional(),
     imageUrl: z.string().max(2000).optional().nullable(),
+    /** Real per-brand product line — null clears it back to "not grouped under a line". */
+    productLine: z.string().trim().max(120).optional().nullable(),
     unitPrice: z.number().positive().optional(),
     casePrice: z.number().positive().optional(),
     /** Tier A/B wholesale overrides — null clears the override back to unitPrice/casePrice. */

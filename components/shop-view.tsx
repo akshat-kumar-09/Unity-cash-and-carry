@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { Search, Filter, ChevronLeft, ShoppingCart } from "lucide-react"
 import { UnityLogo } from "@/components/unity-logo"
 import { useCart } from "@/lib/cart-context"
@@ -8,9 +8,9 @@ import { CartFooter } from "@/components/cart-footer"
 import { ShopCategoryAccordion } from "@/components/shop-category-accordion"
 import { AdminBanner } from "@/components/admin-banner"
 import { ProductCatalog } from "@/components/product-catalog"
-import { SHOP_CATEGORIES, SIMPLE_BROWSE_SLUGS, type ProductCategorySlug } from "@/lib/product-categories"
-import type { BrandFilter } from "@/lib/products"
+import { type ProductCategorySlug } from "@/lib/product-categories"
 import { useBackHandler } from "@/lib/use-back-handler"
+import { usePulseOnCartAdded } from "@/lib/cart-feedback"
 
 type ShopViewProps = {
   isAdmin: boolean
@@ -20,70 +20,16 @@ type ShopViewProps = {
 
 export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopViewProps) {
   const { totalItems, openCart } = useCart()
+  const cartPulsing = usePulseOnCartAdded()
   const [search, setSearch] = useState("")
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<ProductCategorySlug | null>(null)
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null)
-  const [selectedBrand, setSelectedBrand] = useState<BrandFilter | null>(null)
 
-  const isBrandOnlyCategory = (slug: ProductCategorySlug | null) =>
-    !!slug && SHOP_CATEGORIES.find((c) => c.id === slug)?.drilldown === "brand_only"
+  const showProductGrid = selectedCategorySlug !== null
 
-  const showProductGrid = useMemo(() => {
-    if (!selectedCategorySlug) return false
-    if (SIMPLE_BROWSE_SLUGS.includes(selectedCategorySlug)) return true
-    if (selectedCategorySlug === "vapes" || selectedCategorySlug === "e_liquids") {
-      return !!(selectedSubcategory && selectedBrand)
-    }
-    if (isBrandOnlyCategory(selectedCategorySlug)) return !!selectedBrand
-    return false
-  }, [selectedCategorySlug, selectedSubcategory, selectedBrand])
-
-  const categoryLabel = useMemo(() => {
-    if (!selectedCategorySlug) return ""
-    return SHOP_CATEGORIES.find((c) => c.id === selectedCategorySlug)?.label ?? selectedCategorySlug
-  }, [selectedCategorySlug])
-
-  const backButtonLabel = useMemo(() => {
-    if (
-      selectedCategorySlug &&
-      (selectedCategorySlug === "vapes" || selectedCategorySlug === "e_liquids") &&
-      selectedSubcategory &&
-      selectedBrand
-    ) {
-      return "Back to brands"
-    }
-    if (selectedCategorySlug && isBrandOnlyCategory(selectedCategorySlug) && selectedBrand) {
-      return "Back to brands"
-    }
-    return "Back to categories"
-  }, [selectedCategorySlug, selectedSubcategory, selectedBrand])
-
-  // Back button: physical/browser back returns to the top category list from anywhere
-  // inside Shop browsing (one press), instead of leaving the app entirely — there was
-  // no history entry recorded for drilling into a category/brand before this.
-  useBackHandler(selectedCategorySlug !== null, () => {
-    setSelectedCategorySlug(null)
-    setSelectedSubcategory(null)
-    setSelectedBrand(null)
-  })
-
-  const resetBrowse = () => {
-    if (
-      selectedCategorySlug &&
-      (selectedCategorySlug === "vapes" || selectedCategorySlug === "e_liquids") &&
-      selectedSubcategory &&
-      selectedBrand
-    ) {
-      setSelectedSubcategory(null)
-      setSelectedBrand(null)
-    } else if (selectedCategorySlug && isBrandOnlyCategory(selectedCategorySlug) && selectedBrand) {
-      setSelectedBrand(null)
-    } else {
-      setSelectedCategorySlug(null)
-      setSelectedSubcategory(null)
-      setSelectedBrand(null)
-    }
-  }
+  // Vapes/e-liquids/pouches never leave the accordion (brand/line/flavour all expand
+  // inline in place) — only the simple-browse categories (papers/filters/etc.) route
+  // here to the flat grid, so hardware back only ever needs this one level.
+  useBackHandler(showProductGrid, () => setSelectedCategorySlug(null))
 
   return (
     <div className="min-h-[100dvh] flex flex-col unity-app-screen w-full md:max-w-4xl md:mx-auto md:shadow-xl md:border-x md:border-slate-200/80">
@@ -105,7 +51,9 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
           <button
             type="button"
             onClick={openCart}
-            className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-600/25 transition hover:bg-blue-700 active:scale-[0.98] unity-tap"
+            className={`relative flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-600/25 transition hover:bg-blue-700 active:scale-[0.98] unity-tap ${
+              cartPulsing ? "animate-cart-pulse" : ""
+            }`}
             aria-label={`View cart (${totalItems} items)`}
           >
             <ShoppingCart className="h-5 w-5" strokeWidth={2.25} />
@@ -141,11 +89,8 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
 
         {!showProductGrid ? (
           <ShopCategoryAccordion
-            onNavigate={({ categorySlug, subcategory, brand }) => {
-              setSelectedCategorySlug(categorySlug)
-              setSelectedSubcategory(subcategory)
-              setSelectedBrand(brand)
-            }}
+            search={search}
+            onNavigate={({ categorySlug }) => setSelectedCategorySlug(categorySlug)}
           />
         ) : (
           <>
@@ -153,50 +98,22 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
             <div className="pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-[35] flex justify-center px-3">
               <button
                 type="button"
-                onClick={resetBrowse}
+                onClick={() => setSelectedCategorySlug(null)}
                 className="pointer-events-auto unity-tap flex w-full max-w-md items-center justify-center gap-2 rounded-2xl border border-slate-200/90 bg-white/95 py-3 pl-4 pr-4 text-sm font-bold uppercase tracking-wide text-blue-700 shadow-lg shadow-slate-900/10 ring-1 ring-slate-200/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/90"
               >
                 <ChevronLeft className="h-5 w-5 shrink-0" aria-hidden />
-                {backButtonLabel}
+                Back to categories
               </button>
             </div>
 
             <div className="px-3 pb-6 pt-3">
-              {selectedCategorySlug && SIMPLE_BROWSE_SLUGS.includes(selectedCategorySlug) ? (
-                <div className="unity-card mb-4 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    {categoryLabel}
-                  </p>
-                  <p className="text-base font-bold text-slate-900">All lines</p>
-                </div>
-              ) : selectedSubcategory && selectedBrand ? (
-                <div className="unity-card mb-4 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    {categoryLabel} · {selectedSubcategory}
-                  </p>
-                  <p className="text-base font-bold text-slate-900">{selectedBrand}</p>
-                </div>
-              ) : (
-                selectedCategorySlug &&
-                isBrandOnlyCategory(selectedCategorySlug) &&
-                selectedBrand && (
-                  <div className="unity-card mb-4 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      {categoryLabel}
-                    </p>
-                    <p className="text-base font-bold text-slate-900">{selectedBrand}</p>
-                  </div>
-                )
-              )}
-
               {selectedCategorySlug && (
                 <ProductCatalog
                   isAdmin={isAdmin}
                   refreshKey={productRefreshKey}
                   search={search}
                   categorySlug={selectedCategorySlug}
-                  activeBrand={selectedBrand ?? "All"}
-                  subcategoryFilter={selectedSubcategory}
+                  activeBrand="All"
                   onProductUpdated={() => {
                     onProductAdded?.()
                   }}

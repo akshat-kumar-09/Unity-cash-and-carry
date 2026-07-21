@@ -24,11 +24,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
-    const { name, description, imageUrl, unitPrice, casePrice, unitPriceA, casePriceA, unitPriceB, casePriceB, unitsPerPack, packLabel, maxQtyPerOrder, liquidVolumeMl, isSubjectToVapeDuty, nicotineStrengthMg } = parsed.data
+    const { name, description, imageUrl, productLine, unitPrice, casePrice, unitPriceA, casePriceA, unitPriceB, casePriceB, unitsPerPack, packLabel, maxQtyPerOrder, liquidVolumeMl, isSubjectToVapeDuty, nicotineStrengthMg } = parsed.data
     const data: {
       name?: string
       description?: string
       imageUrl?: string | null
+      productLine?: string | null
       unitPrice?: number
       casePrice?: number
       unitPriceA?: number | null
@@ -46,6 +47,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (description !== undefined) data.description = description.trim()
     if (imageUrl !== undefined) {
       data.imageUrl = imageUrl === "" || imageUrl === null ? null : imageUrl.trim()
+    }
+    if (productLine !== undefined) {
+      data.productLine = productLine === "" || productLine === null ? null : productLine.trim()
     }
     if (unitPrice !== undefined) data.unitPrice = unitPrice
     if (casePrice !== undefined) data.casePrice = casePrice

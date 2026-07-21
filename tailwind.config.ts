@@ -104,6 +104,12 @@ const config: Config = {
           from: { opacity: '0', transform: 'translateY(12px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        'cart-pulse': {
+          '0%': { transform: 'scale(1)' },
+          '30%': { transform: 'scale(1.18)' },
+          '55%': { transform: 'scale(0.96)' },
+          '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -114,6 +120,7 @@ const config: Config = {
         'shimmer': 'shimmer 3s linear infinite',
         'scale-in': 'scale-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'slide-up-fade': 'slide-up-fade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'cart-pulse': 'cart-pulse 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
       backgroundSize: {
         'gradient-auth': '200% 200%',

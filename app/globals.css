@@ -52,6 +52,19 @@
       rgba(37, 99, 235, 0.045) 10px
     );
   }
+
+  /* Same stripe, mirrored angle — used to alternate direction one level to the next
+     down the shop drill-down (category / brand / line / flavours) so each nested box
+     reads as a distinct step instead of a flat repeat of its parent. */
+  .shop-vape-stripes-alt {
+    background-image: repeating-linear-gradient(
+      11deg,
+      transparent,
+      transparent 9px,
+      rgba(37, 99, 235, 0.045) 9px,
+      rgba(37, 99, 235, 0.045) 10px
+    );
+  }
 }
 
 /* Auth page: punchy gradient — feels premium on mobile */
@@ -71,6 +84,91 @@
 @keyframes auth-gradient-shift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
+}
+
+/* Welcome-build game: wrong-piece bounce-back and win-moment vapor puff. Both are
+   opt-out under prefers-reduced-motion by the component never applying these classes. */
+.welcome-build-bounce-back {
+  animation: welcome-build-bounce 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes welcome-build-bounce {
+  0% { transform: translateX(0); }
+  30% { transform: translateX(-6px) rotate(-4deg); }
+  60% { transform: translateX(5px) rotate(3deg); }
+  100% { transform: translateX(0) rotate(0); }
+}
+.welcome-build-vapor {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 70%);
+  filter: blur(3px);
+  animation: welcome-build-vapor-rise 1.6s ease-out forwards;
+}
+@keyframes welcome-build-vapor-rise {
+  0% { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+  25% { opacity: 0.9; }
+  100% { transform: translate(-50%, -60px) scale(1.8); opacity: 0; }
+}
+
+/* Ink stamp — the "Partner since" seal on the Trade Pass reveal. Lands heavy, slightly
+   rotated and imperfect, like a real rubber stamp rather than a UI badge. */
+@keyframes ink-stamp-land {
+  0% { transform: scale(2.4) rotate(-22deg); opacity: 0; }
+  55% { transform: scale(0.92) rotate(-4deg); opacity: 1; }
+  75% { transform: scale(1.06) rotate(-8deg); }
+  100% { transform: scale(1) rotate(-6deg); opacity: 1; }
+}
+.ink-stamp-land {
+  animation: ink-stamp-land 560ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+.ink-stamp-land-reduced {
+  animation: none;
+  transform: rotate(-6deg);
+  opacity: 1;
+}
+@keyframes ink-spread-pulse {
+  0% { transform: scale(0.3); opacity: 0.5; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+.ink-spread-pulse {
+  animation: ink-spread-pulse 480ms ease-out forwards;
+}
+
+/* Premium card treatment — grain texture + a one-time diagonal sheen sweep on reveal. */
+.premium-card-grain {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+.premium-card-sheen {
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.12) 45%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0.12) 55%,
+    transparent 70%
+  );
+  background-size: 250% 250%;
+  background-position: -120% -120%;
+  animation: premium-card-sheen-sweep 1.4s ease-out 250ms 1 forwards;
+}
+@keyframes premium-card-sheen-sweep {
+  to { background-position: 120% 120%; }
+}
+
+/* Win-moment sparkles on the welcome-build reveal. */
+@keyframes welcome-build-sparkle-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(20deg); }
+}
+.welcome-build-sparkle {
+  color: #fde68a;
+  font-size: 16px;
+  animation: welcome-build-sparkle-twinkle 1.6s ease-in-out infinite;
 }
 
 /* Shop dashboard: solid opaque bar so content doesn't bleed through when scrolling */

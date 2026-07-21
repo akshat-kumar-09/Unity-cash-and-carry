@@ -45,12 +45,15 @@ type Order = {
   items?: OrderItem[]
 }
 
-const STATUS_STYLE: Record<string, { bg: string; text: string; dot: string; icon: typeof Clock }> = {
-  pending: { bg: "bg-amber-50 border-amber-200", text: "text-amber-700", dot: "bg-amber-500", icon: Clock },
-  confirmed: { bg: "bg-cyan-50 border-cyan-200", text: "text-cyan-700", dot: "bg-cyan-500", icon: CheckCircle2 },
-  dispatched: { bg: "bg-blue-50 border-blue-200", text: "text-blue-700", dot: "bg-blue-500", icon: Truck },
-  delivered: { bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", dot: "bg-emerald-500", icon: CheckCircle2 },
-  cancelled: { bg: "bg-slate-100 border-slate-200", text: "text-slate-500", dot: "bg-slate-400", icon: XCircle },
+const STATUS_STYLE: Record<
+  string,
+  { bg: string; text: string; dot: string; icon: typeof Clock; accent: string; card: string }
+> = {
+  pending: { bg: "bg-amber-50 border-amber-200", text: "text-amber-700", dot: "bg-amber-500", icon: Clock, accent: "border-l-amber-400", card: "from-white to-amber-50/60" },
+  confirmed: { bg: "bg-cyan-50 border-cyan-200", text: "text-cyan-700", dot: "bg-cyan-500", icon: CheckCircle2, accent: "border-l-cyan-400", card: "from-white to-cyan-50/60" },
+  dispatched: { bg: "bg-blue-50 border-blue-200", text: "text-blue-700", dot: "bg-blue-500", icon: Truck, accent: "border-l-blue-400", card: "from-white to-blue-50/70" },
+  delivered: { bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", dot: "bg-emerald-500", icon: CheckCircle2, accent: "border-l-emerald-400", card: "from-white to-emerald-50/60" },
+  cancelled: { bg: "bg-slate-100 border-slate-200", text: "text-slate-500", dot: "bg-slate-400", icon: XCircle, accent: "border-l-slate-300", card: "from-white to-slate-100/70" },
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -62,6 +65,15 @@ function StatusPill({ status }: { status: string }) {
       {status}
     </span>
   )
+}
+
+/** Short "what was bought" summary for the card header — replaces the raw order
+ *  reference as the primary label, which read as clutter rather than useful info. */
+function orderBrief(order: Order): string {
+  const names = (order.items ?? []).map((i) => i.product?.name).filter((n): n is string => Boolean(n))
+  if (names.length === 0) return "Order details unavailable"
+  if (names.length <= 2) return names.join(", ")
+  return `${names.slice(0, 2).join(", ")} +${names.length - 2} more`
 }
 
 export function OrdersView() {
@@ -165,7 +177,12 @@ export function OrdersView() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col unity-app-screen pb-28 md:max-w-4xl md:mx-auto md:w-full md:border-x md:border-slate-200/80 md:shadow-xl bg-slate-50/60">
+    <div className="relative flex min-h-[100dvh] flex-col overflow-hidden pb-28 md:max-w-4xl md:mx-auto md:w-full md:shadow-xl bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950">
+      {/* White design bits — soft decorative shapes on the blue page */}
+      <div className="pointer-events-none absolute -right-16 top-24 h-56 w-56 rounded-full bg-white/5 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 top-1/2 h-64 w-64 rounded-full bg-cyan-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-10 bottom-32 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
+
       <AppScreenHeader title="Orders" subtitle="Your order history and status" />
 
       {/* Print Overlay CSS */}
@@ -194,14 +211,29 @@ export function OrdersView() {
         }
       `}</style>
 
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-3.5">
+      {/* Premium summary band — frosted glass panel, the page itself is already blue */}
+      {!loading && !error && (
+        <div className="relative mx-4 mt-4 overflow-hidden rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-white shadow-lg backdrop-blur-md">
+          <p className="text-[9.5px] font-black uppercase tracking-[0.25em] text-blue-100/80">
+            Order History
+          </p>
+          <div className="mt-2">
+            <p className="text-[26px] font-black leading-none">{orders.length}</p>
+            <p className="mt-1 text-[9.5px] font-bold uppercase tracking-wider text-blue-100/70">
+              {orders.length === 1 ? "Order placed" : "Orders placed"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <main className="relative flex-1 overflow-y-auto px-4 py-4 space-y-3.5">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          <p className="text-[11px] font-bold text-blue-100/80 uppercase tracking-wider">
             {loading ? "Loading…" : `${orders.length} ${orders.length === 1 ? "order" : "orders"}`}
           </p>
           <button
             onClick={() => { setLoading(true); fetchOrders(true); }}
-            className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest transition-all"
+            className="flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-[10px] font-black text-white hover:bg-white/20 uppercase tracking-widest transition-all active:scale-[0.97]"
           >
             <RefreshCw className="h-3 w-3" /> Sync
           </button>
@@ -209,7 +241,7 @@ export function OrdersView() {
 
         {loading && (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
+            <Loader2 className="h-9 w-9 animate-spin text-white" />
           </div>
         )}
 
@@ -220,9 +252,9 @@ export function OrdersView() {
         )}
 
         {!loading && !error && orders.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white py-16 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
-              <Package className="h-7 w-7 text-slate-400" />
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-blue-200 bg-gradient-to-br from-white to-blue-50/50 py-16 text-center">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 border border-blue-100">
+              <Package className="h-7 w-7 text-blue-400" />
             </div>
             <p className="text-[15px] font-bold text-slate-800">No orders placed yet</p>
             <p className="unity-meta mt-1 max-w-[240px]">
@@ -239,8 +271,8 @@ export function OrdersView() {
               return (
                 <li
                   key={order.id}
-                  className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-all ${
-                    isExpanded ? "border-blue-200 shadow-md ring-1 ring-blue-100" : "border-slate-150 hover:border-slate-250"
+                  className={`overflow-hidden rounded-2xl border border-l-4 bg-gradient-to-br shadow-sm transition-all ${s.card} ${s.accent} ${
+                    isExpanded ? "border-blue-300 shadow-md ring-1 ring-blue-100" : "border-slate-150 hover:border-blue-200 hover:shadow-md"
                   }`}
                 >
                   {/* Summary Card Header */}
@@ -249,22 +281,22 @@ export function OrdersView() {
                     onClick={() => toggleExpand(order.id)}
                     className="flex w-full items-center gap-3 px-4 py-4 text-left focus:outline-none"
                   >
-                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${s.bg} border`}>
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${s.bg} border shadow-sm`}>
                       <Package className={`h-5 w-5 ${s.text}`} />
                     </div>
 
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="font-mono text-[13.5px] font-black text-slate-900 truncate">
-                          #{order.orderNumber}
+                        <p className="text-[13.5px] font-bold text-slate-800 truncate">
+                          {orderBrief(order)}
                         </p>
-                        <p className="shrink-0 font-mono text-[15px] font-black text-slate-900">
+                        <p className="shrink-0 font-mono text-[15px] font-black text-blue-700">
                           £{order.total.toFixed(2)}
                         </p>
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[10.5px] font-semibold text-slate-400">
-                          {formatDate(order.createdAt)}
+                        <p className="font-mono text-[10px] font-semibold text-slate-400 truncate">
+                          #{order.orderNumber} · {formatDate(order.createdAt)}
                         </p>
                         <div className="flex items-center gap-1.5">
                           {order.paymentStatus === "unpaid" && order.total > 0 && (

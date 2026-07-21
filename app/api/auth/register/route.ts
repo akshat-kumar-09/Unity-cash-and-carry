@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { companyName, name, email, phone, address, vatNumber } = body
+    const { companyName, name, email, phone, address, postcode, vatNumber, businessType, reference } = body
 
     if (!email || !companyName || !name || !vatNumber) {
       return jsonResponse(
@@ -83,17 +83,29 @@ export async function POST(request: NextRequest) {
     // Generate default tradeCode (random suffix to guarantee uniqueness)
     const tradeCode = `UT-${Math.floor(1000 + Math.random() * 9000)}`
 
+    // Reference (UWC-XXXXXX) is generated client-side by the onboarding pass card and
+    // sent through untouched — stored here so it's genuinely tied to this record rather
+    // than being a purely decorative number, same pattern as phone/address below.
+    const noteLines = [
+      `Contact Phone: ${phone || "Not provided"}`,
+      `Retail Address: ${address || "Not provided"}`,
+      `Business Type: ${businessType || "Not provided"}`,
+    ]
+    if (reference) noteLines.push(`Trade Pass Reference: ${reference}`)
+    noteLines.push(`Generated Temp Password (encrypted): ${encryptedTempPassword}`)
+
     const user = await prisma.user.create({
       data: {
         email: email.toLowerCase(),
         name,
         companyName,
         vatNumber,
+        postcode: typeof postcode === "string" && postcode.trim() ? postcode.trim() : null,
         password: hashedPassword,
         tradeCode,
         role: "customer",
         complianceStatus: "pending",
-        complianceNotes: `Contact Phone: ${phone || "Not provided"}\nRetail Address: ${address || "Not provided"}\nGenerated Temp Password (encrypted): ${encryptedTempPassword}`,
+        complianceNotes: noteLines.join("\n"),
       },
     })
 
@@ -102,6 +114,7 @@ export async function POST(request: NextRequest) {
         success: true,
         message: "VIP Activation request submitted successfully.",
         userId: user.id,
+        reference: reference || null,
       },
       201
     )

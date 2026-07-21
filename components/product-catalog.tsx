@@ -7,15 +7,13 @@ import { ProductCard } from "./product-card"
 import { BrandHeader } from "./brand-header"
 import { EditProductModal } from "./edit-product-modal"
 import { BulkEditProductsModal } from "./bulk-edit-products-modal"
-import { PRODUCT_LINES_BY_BRAND, type ProductCategorySlug } from "@/lib/product-categories"
+import type { ProductCategorySlug } from "@/lib/product-categories"
 
 function isLiveCatalogProduct(p: Product) {
   return !String(p.id).startsWith("demo-")
 }
 
 const PAGE_SIZE = 24
-/** When drilling into vape/e-liquid sub-shelves, fetch more rows so client-side subcategory rules aren’t applied to a tiny first page only (max allowed by API is 100). */
-const SUBCATEGORY_FETCH_LIMIT = 100
 
 type ProductCatalogProps = {
   isAdmin?: boolean
@@ -23,60 +21,7 @@ type ProductCatalogProps = {
   search: string
   categorySlug: ProductCategorySlug
   activeBrand: BrandFilter
-  /** When set, filter products by subcategory (vaping / e-liquids ladders). */
-  subcategoryFilter?: string | null
   onProductUpdated?: () => void
-}
-
-function matchesSubcategory(
-  product: Product,
-  subcategory: string,
-  categorySlug: ProductCategorySlug
-): boolean {
-  // productLine (e.g. "BB 4000 Kit", "Pulse Pods", "IVG Salts") is a more reliable signal
-  // than free-text name/SKU alone — fall back to name+SKU when it's not set.
-  const line = product.productLine ?? ""
-  const haystack = `${product.name} ${product.sku ?? ""} ${line}`
-
-  if (categorySlug === "e_liquids") {
-    if (subcategory === "Nic Salts") {
-      return /\bsalts?\b|\bnic\s*salt\b|\b20\s*mg\b/i.test(haystack)
-    }
-    if (subcategory === "Freebase") {
-      return /\bfreebase\b|\b(3|6|12)\s*mg\b/i.test(haystack)
-    }
-    if (subcategory === "Shortfills") {
-      return /\bshort\s*fill\w*\b|\b50\s*ml\b|\b100\s*ml\b/i.test(haystack)
-    }
-    if (subcategory === "Bar Salts") {
-      return /\bbar\s*salts?\b|\bdisposable\b/i.test(haystack)
-    }
-    return true
-  }
-
-  if (categorySlug !== "vapes") return true
-
-  const isPodOrKitLine = /\bpods?\b|\bkit\b/i.test(line)
-  const isCompliant600 = /\b600\b/i.test(haystack) || /EB6|6\d{2}/i.test(product.sku ?? "")
-
-  if (subcategory === "NEW Compliant 600 Puffs") {
-    return isCompliant600
-  }
-  if (subcategory === "Pre-filled POD Systems") {
-    const isPrefilledPodLine = /\bpods?\b/i.test(line) && !/\bkit\b/i.test(line)
-    return isPrefilledPodLine || /\bpre[- ]?filled\s*pod/i.test(haystack)
-  }
-  if (subcategory === "Open POD Systems") {
-    const isRefillableKitLine = /\bkit\b/i.test(line) && !isCompliant600
-    return isRefillableKitLine || /\bopen\s*pod\b|\brefillable\b/i.test(haystack)
-  }
-  if (subcategory === "Big Puff Devices") {
-    // High-puff disposables/rechargeables: 4+ digit puff counts or "10K"-style shorthand,
-    // excluding the compliant 600 line and anything already tagged as a kit/pod product line.
-    const hasBigPuffMarker = /\b\d{4,}\b|\b\d{1,2}k\b/i.test(haystack)
-    return hasBigPuffMarker && !isCompliant600 && !isPodOrKitLine
-  }
-  return true
 }
 
 export function ProductCatalog({
@@ -85,7 +30,6 @@ export function ProductCatalog({
   search,
   categorySlug,
   activeBrand,
-  subcategoryFilter = null,
   onProductUpdated,
 }: ProductCatalogProps) {
   const [products, setProducts] = useState<Product[]>([])
@@ -99,7 +43,6 @@ export function ProductCatalog({
   const [usingDemo, setUsingDemo] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkModalOpen, setBulkModalOpen] = useState(false)
-  const [selectedLine, setSelectedLine] = useState<string | null>(null)
   const [selectingAll, setSelectingAll] = useState(false)
 
   const fetchPage = useCallback(async (pageNum: number, append: boolean) => {
@@ -108,8 +51,7 @@ export function ProductCatalog({
     if (activeBrand !== "All") params.append("brand", activeBrand)
     if (search.trim()) params.append("search", search.trim())
     params.set("page", String(pageNum))
-    const limit = subcategoryFilter != null ? SUBCATEGORY_FETCH_LIMIT : PAGE_SIZE
-    params.set("limit", String(limit))
+    params.set("limit", String(PAGE_SIZE))
 
     const response = await fetch(`/api/products?${params.toString()}`)
     const data = await response.json()
@@ -123,7 +65,7 @@ export function ProductCatalog({
       return { total: data.total, totalPages: data.totalPages ?? 1 }
     }
     throw new Error("Invalid response")
-  }, [activeBrand, search, categorySlug, subcategoryFilter])
+  }, [activeBrand, search, categorySlug])
 
   useEffect(() => {
     let cancelled = false
@@ -135,8 +77,7 @@ export function ProductCatalog({
         if (activeBrand !== "All") params.append("brand", activeBrand)
         if (search.trim()) params.append("search", search.trim())
         params.set("page", "1")
-        const limit = subcategoryFilter != null ? SUBCATEGORY_FETCH_LIMIT : PAGE_SIZE
-        params.set("limit", String(limit))
+        params.set("limit", String(PAGE_SIZE))
 
         const response = await fetch(`/api/products?${params.toString()}`)
         const data = await response.json()
@@ -178,48 +119,23 @@ export function ProductCatalog({
     }
     load()
     return () => { cancelled = true }
-  }, [activeBrand, search, refreshKey, categorySlug, subcategoryFilter])
+  }, [activeBrand, search, refreshKey, categorySlug])
 
-  // Everything except the productLine filter — this is what actually exists for the
-  // current category/brand/subcategory, and is what the line pills below should be
-  // derived from. Without this, PRODUCT_LINES_BY_BRAND (a flat per-brand list spanning
-  // every category, e.g. IVG's vape hardware lines AND its "IVG Salts" e-liquid line)
-  // showed every one of a brand's lines regardless of which category you're browsing,
-  // so most pills pointed at zero products (e.g. IVG's vape lines while under E-liquids).
-  const contextFiltered = useMemo(() => {
+  const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     const source = usingDemo ? demoProducts : products
-    return source.filter((p) => {
+    const list = source.filter((p) => {
       if (p.category !== categorySlug) return false
       if (!matchesBrandFilter(p, activeBrand)) return false
-      if (!isAdmin && subcategoryFilter && !matchesSubcategory(p, subcategoryFilter, categorySlug)) return false
       if (q && !p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q) && !(p.sku ?? "").toLowerCase().includes(q)) return false
       return true
     })
-  }, [products, usingDemo, activeBrand, search, subcategoryFilter, categorySlug, isAdmin])
-
-  const availableLines = useMemo(() => {
-    if (!((categorySlug === "vapes" || categorySlug === "e_liquids") && activeBrand !== "All")) return undefined
-    const knownOrder = PRODUCT_LINES_BY_BRAND[activeBrand] ?? []
-    const present = new Set(contextFiltered.map((p) => p.productLine).filter(Boolean))
-    const lines = knownOrder.filter((line) => present.has(line))
-    return lines.length > 0 ? lines : undefined
-  }, [categorySlug, activeBrand, contextFiltered])
-
-  const filtered = useMemo(() => {
-    const list = selectedLine
-      ? contextFiltered.filter((p) => p.productLine === selectedLine)
-      : contextFiltered
     return [...list].sort((a, b) => a.brand.localeCompare(b.brand) || a.name.localeCompare(b.name))
-  }, [contextFiltered, selectedLine])
+  }, [products, usingDemo, activeBrand, search, categorySlug])
 
   useEffect(() => {
     setSelectedIds([])
-  }, [categorySlug, activeBrand, search, subcategoryFilter, usingDemo])
-
-  useEffect(() => {
-    setSelectedLine(null)
-  }, [categorySlug, activeBrand])
+  }, [categorySlug, activeBrand, search, usingDemo])
 
   const toggleSelectProduct = useCallback((id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -227,7 +143,7 @@ export function ProductCatalog({
 
   const clearSelection = useCallback(() => setSelectedIds([]), [])
 
-  const useClientFilter = usingDemo || subcategoryFilter != null || selectedLine != null
+  const useClientFilter = usingDemo
   const demoTotal = filtered.length
   const demoPageSize = PAGE_SIZE
   const demoDisplayed = useClientFilter ? filtered.slice(0, page * demoPageSize) : products
@@ -261,13 +177,12 @@ export function ProductCatalog({
       }
       const ids = collected
         .filter((p) => isLiveCatalogProduct(p))
-        .filter((p) => !selectedLine || p.productLine === selectedLine)
         .map((p) => p.id)
       setSelectedIds(Array.from(new Set(ids)))
     } finally {
       setSelectingAll(false)
     }
-  }, [isAdmin, usingDemo, categorySlug, activeBrand, search, selectedLine])
+  }, [isAdmin, usingDemo, categorySlug, activeBrand, search])
 
   const handleLoadMore = async () => {
     if (useClientFilter) {
@@ -344,11 +259,9 @@ export function ProductCatalog({
             >
               {selectingAll
                 ? "Selecting…"
-                : selectedLine
-                  ? `Select all ${selectedLine}`
-                  : activeBrand !== "All"
-                    ? `Select all ${activeBrand}`
-                    : "Select all in category"}
+                : activeBrand !== "All"
+                  ? `Select all ${activeBrand}`
+                  : "Select all in category"}
             </button>
           )}
         </div>
@@ -359,37 +272,6 @@ export function ProductCatalog({
           </p>
         </div>
       </div>
-
-      {/* Real per-brand product line filter (e.g. Higo: Pulse Kit, BB 4000 Kit, Alfa Pro Kit…) */}
-      {availableLines && availableLines.length > 0 && (
-        <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <button
-            type="button"
-            onClick={() => setSelectedLine(null)}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
-              selectedLine === null
-                ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700"
-            }`}
-          >
-            All
-          </button>
-          {availableLines.map((line) => (
-            <button
-              key={line}
-              type="button"
-              onClick={() => setSelectedLine(line)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition ${
-                selectedLine === line
-                  ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700"
-              }`}
-            >
-              {line}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* API fallback notice — calm, not alarming */}
       {error && (

@@ -33,6 +33,9 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {
       isActive: true,
+      // Excludes hidden system items (e.g. the welcome-build gift brochure) from browse/
+      // search — distinct from isActive, which cart/order validation also depends on.
+      isCatalogueVisible: true,
     }
 
     if (category && category !== "all") {

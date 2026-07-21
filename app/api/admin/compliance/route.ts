@@ -78,6 +78,13 @@ export async function PATCH(request: NextRequest) {
     if (complianceNotes !== undefined) data.complianceNotes = complianceNotes
     if (priceTier !== undefined) data.priceTier = priceTier
 
+    // Trade Pass "Partner since" date — stamped once, on the first-ever approval, so a
+    // later block/re-approve cycle doesn't reset it.
+    if (complianceStatus === "approved") {
+      const existing = await prisma.user.findUnique({ where: { id: userId }, select: { approvedAt: true } })
+      if (!existing?.approvedAt) data.approvedAt = new Date()
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
       data,

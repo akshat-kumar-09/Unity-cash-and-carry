@@ -150,7 +150,10 @@ export function RetailAssistView() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col unity-app-screen pb-28 md:max-w-4xl md:mx-auto md:w-full md:border-x md:border-slate-200/80 md:shadow-xl bg-slate-50/50">
+    <div className="relative flex min-h-[100dvh] flex-col overflow-hidden pb-28 md:max-w-4xl md:mx-auto md:w-full md:shadow-xl bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950">
+      <div className="pointer-events-none absolute -right-16 top-24 h-56 w-56 rounded-full bg-white/5 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 top-1/2 h-64 w-64 rounded-full bg-cyan-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-10 bottom-32 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
       <AppScreenHeader
         title={
           activePanel === "hub"
@@ -254,17 +257,27 @@ export function RetailAssistView() {
               </div>
             </div>
 
+            {/* How It Works — the exact moment this tool exists for */}
+            <div className="rounded-2xl border border-blue-100 bg-white p-5 space-y-3.5 text-left shadow-sm">
+              <h3 className="text-[13px] font-black text-slate-900">When an inspector asks for your numbers</h3>
+              <div className="space-y-3">
+                {[
+                  "An inspector visits your shop and asks to see your stock and duty numbers.",
+                  "Open Unity and tap Generate Inspector Summary below.",
+                  "Show them your live compliance report, right from your phone. You're aligned.",
+                ].map((step, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[11px] font-black text-white">
+                      {i + 1}
+                    </span>
+                    <p className="pt-0.5 text-[12px] leading-relaxed text-slate-600">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Generate Summary Action */}
             <div className="space-y-3.5">
-              <div className="text-left">
-                <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                  HMRC Audit Protocol
-                </h4>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  In the event of an HMRC inspection, click below to generate a digital compliance summary.
-                </p>
-              </div>
-
               <button
                 type="button"
                 onClick={() => setActivePanel("summary")}
@@ -474,19 +487,19 @@ export function RetailAssistView() {
           <div className="space-y-6">
             <button
               onClick={() => setActivePanel("hub")}
-              className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-wider hover:text-slate-800 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-blue-100/80 font-bold uppercase tracking-wider hover:text-white transition-colors"
             >
               <ChevronLeft className="h-4 w-4" /> Back to Compliance Hub
             </button>
 
-            <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-blue-600 to-blue-700 p-6 text-white shadow-lg shadow-blue-600/20">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-blue-100">Available Balance</p>
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-lg">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-blue-600">Available Balance</p>
               {walletLoading ? (
-                <Loader2 className="h-7 w-7 animate-spin text-white mt-2" />
+                <Loader2 className="h-7 w-7 animate-spin text-blue-600 mt-2" />
               ) : (
-                <p className="text-4xl font-black tracking-tight mt-1">£{walletBalance.toFixed(2)}</p>
+                <p className="text-4xl font-black tracking-tight mt-1 text-slate-900">£{walletBalance.toFixed(2)}</p>
               )}
-              <p className="text-[11px] text-blue-100 mt-2">Applied automatically at checkout — see Rewards tab to redeem.</p>
+              <p className="text-[11px] text-slate-500 mt-2">Applied automatically at checkout. See Rewards tab to redeem.</p>
             </div>
 
             <div className="rounded-2xl border border-slate-200/90 bg-white overflow-hidden">
@@ -530,7 +543,7 @@ export function RetailAssistView() {
           <div className="space-y-6">
             <button
               onClick={() => setActivePanel("hub")}
-              className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-wider hover:text-slate-800 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-blue-100/80 font-bold uppercase tracking-wider hover:text-white transition-colors"
             >
               <ChevronLeft className="h-4 w-4" /> Back to Compliance Hub
             </button>

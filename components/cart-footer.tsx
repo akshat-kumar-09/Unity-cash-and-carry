@@ -6,6 +6,7 @@ import { useCart } from "@/lib/cart-context"
 import { useSession } from "next-auth/react"
 import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
 import { useBackHandler } from "@/lib/use-back-handler"
+import { usePulseOnCartAdded } from "@/lib/cart-feedback"
 
 type CheckoutFormData = {
   customerPhone: string
@@ -34,6 +35,7 @@ export function CartFooter() {
     closeCart,
   } = useCart()
   const { data: session } = useSession()
+  const cartPulsing = usePulseOnCartAdded()
   const [showCheckoutForm, setShowCheckoutForm] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -216,7 +218,11 @@ export function CartFooter() {
     <>
       {/* Sticky Footer Bar — only when cart has items */}
       {totalItems > 0 && (
-        <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 bg-blue-700 border-t-2 border-blue-800/50 shadow-lg">
+        <div
+          className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 bg-blue-700 border-t-2 border-blue-800/50 shadow-lg ${
+            cartPulsing ? "animate-cart-pulse" : ""
+          }`}
+        >
           <button
             type="button"
             onClick={openCart}

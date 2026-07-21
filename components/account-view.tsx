@@ -2,17 +2,20 @@
 
 import { useSession, signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
-import { LogOut, Shield, Building2, FileText, CheckCircle2, Clock, XCircle, KeyRound } from "lucide-react"
+import { LogOut, Shield, Building2, FileText, MapPin, CheckCircle2, Clock, XCircle, KeyRound, ChevronDown } from "lucide-react"
 import { UnityLogo } from "@/components/unity-logo"
 import { AppScreenHeader } from "@/components/app-screen-header"
+import { TradeIdCard } from "@/components/trade-id-card"
 import { toast } from "sonner"
 
 type ComplianceData = {
   vatNumber: string | null
   companyNumber: string | null
   companyName: string | null
+  postcode: string | null
   retailerLicenseRef: string | null
   complianceStatus: string
+  approvedAt: string | null
 }
 
 export function AccountView() {
@@ -23,6 +26,7 @@ export function AccountView() {
     vatNumber: "",
     companyNumber: "",
     companyName: "",
+    postcode: "",
     retailerLicenseRef: "",
   })
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
@@ -30,6 +34,8 @@ export function AccountView() {
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" })
   const [pwSaving, setPwSaving] = useState(false)
   const [pwError, setPwError] = useState("")
+  const [complianceOpen, setComplianceOpen] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -59,7 +65,7 @@ export function AccountView() {
   }
 
   useEffect(() => {
-    fetch("/api/admin/compliance?self=true")
+    fetch("/api/account/profile")
       .then((r) => r.json())
       .then((data) => {
         if (data && !data.error) {
@@ -68,6 +74,7 @@ export function AccountView() {
             vatNumber: data.vatNumber || "",
             companyNumber: data.companyNumber || "",
             companyName: data.companyName || "",
+            postcode: data.postcode || "",
             retailerLicenseRef: data.retailerLicenseRef || "",
           })
         }
@@ -78,10 +85,10 @@ export function AccountView() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await fetch("/api/admin/compliance", {
+      await fetch("/api/account/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, selfUpdate: true }),
+        body: JSON.stringify(form),
       })
       setCompliance((prev) =>
         prev ? { ...prev, ...form, complianceStatus: "pending" } : prev
@@ -162,6 +169,16 @@ export function AccountView() {
           <p className="unity-meta mt-1">{session?.user?.email ?? "—"}</p>
         </div>
 
+        {/* Trade ID Card — built by hand in the welcome game, lives here permanently */}
+        {!isAdminUser && compliance && (
+          <TradeIdCard
+            companyName={compliance.companyName}
+            name={session?.user?.name ?? null}
+            vatNumber={compliance.vatNumber}
+            approvedAt={compliance.approvedAt}
+          />
+        )}
+
         {/* Compliance Status Banner */}
         <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 ${statusInfo.bg}`}>
           <StatusIcon className={`h-5 w-5 shrink-0 ${statusInfo.color}`} />
@@ -183,13 +200,20 @@ export function AccountView() {
         {/* Business Compliance Form — doesn't apply to the platform admin account */}
         {!isAdminUser && (
         <div className="unity-card overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
-            <Shield className="h-4 w-4 text-blue-600" />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <button
+            type="button"
+            onClick={() => setComplianceOpen((o) => !o)}
+            aria-expanded={complianceOpen}
+            className="unity-tap flex w-full items-center gap-2 px-4 py-3.5 text-left"
+          >
+            <Shield className="h-4 w-4 text-blue-600 shrink-0" />
+            <span className="flex-1 text-[13px] font-semibold text-slate-800">
               Business Compliance & Licensing
             </span>
-          </div>
-          <div className="px-4 py-4 space-y-4">
+            <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${complianceOpen ? "rotate-180" : ""}`} />
+          </button>
+          {complianceOpen && (
+          <div className="border-t border-slate-100 px-4 py-4 space-y-4">
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Company / Business Name
@@ -216,6 +240,21 @@ export function AccountView() {
                 placeholder="GB123456789"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Postcode
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={form.postcode}
+                  onChange={(e) => setForm((f) => ({ ...f, postcode: e.target.value }))}
+                  placeholder="G1 1AA"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
@@ -252,18 +291,24 @@ export function AccountView() {
               {saving ? "Saving…" : "Save Compliance Details"}
             </button>
           </div>
+          )}
         </div>
         )}
 
         {/* Change Password */}
         <div className="unity-card overflow-hidden">
-          <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
-            <KeyRound className="h-4 w-4 text-blue-600" />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Change Password
-            </span>
-          </div>
-          <div className="px-4 py-4 space-y-3">
+          <button
+            type="button"
+            onClick={() => setPasswordOpen((o) => !o)}
+            aria-expanded={passwordOpen}
+            className="unity-tap flex w-full items-center gap-2 px-4 py-3.5 text-left"
+          >
+            <KeyRound className="h-4 w-4 text-blue-600 shrink-0" />
+            <span className="flex-1 text-[13px] font-semibold text-slate-800">Change Password</span>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${passwordOpen ? "rotate-180" : ""}`} />
+          </button>
+          {passwordOpen && (
+          <div className="border-t border-slate-100 px-4 py-4 space-y-3">
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Current Password
@@ -311,6 +356,7 @@ export function AccountView() {
               {pwSaving ? "Updating…" : "Update Password"}
             </button>
           </div>
+          )}
         </div>
 
         {/* PWA Install Button */}

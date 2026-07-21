@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { X, Pencil } from "lucide-react"
 import { getEffectiveMaxQtyPerOrder, type Product } from "@/lib/products"
+import { PRODUCT_LINES_BY_BRAND } from "@/lib/product-categories"
 
 type EditProductModalProps = {
   product: Product | null
@@ -20,6 +21,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [imageUrl, setImageUrl] = useState("")
+  const [productLine, setProductLine] = useState("")
   const [casePriceStr, setCasePriceStr] = useState("")
   const [unitPriceStr, setUnitPriceStr] = useState("")
   const [casePriceAStr, setCasePriceAStr] = useState("")
@@ -40,6 +42,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       setName(product.name)
       setDescription(product.description ?? "")
       setImageUrl(product.imageUrl ?? "")
+      setProductLine(product.productLine ?? "")
       setCasePriceStr(String(roundMoney(product.casePrice)))
       setUnitPriceStr(String(roundMoney(product.unitPrice)))
       setCasePriceAStr(product.casePriceA != null ? String(roundMoney(product.casePriceA)) : "")
@@ -80,6 +83,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
         name?: string
         description?: string
         imageUrl?: string | null
+        productLine?: string | null
         casePrice?: number
         unitPrice?: number
         casePriceA?: number | null
@@ -110,6 +114,12 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       const prev = product.imageUrl ?? ""
       if (trimmed !== prev) {
         body.imageUrl = trimmed === "" ? null : trimmed
+      }
+
+      const lineTrimmed = productLine.trim()
+      const linePrev = product.productLine ?? ""
+      if (lineTrimmed !== linePrev) {
+        body.productLine = lineTrimmed === "" ? null : lineTrimmed
       }
 
       const caseP = parseFloat(casePriceStr.replace(",", "."))
@@ -439,6 +449,25 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
                 </div>
               </div>
             )}
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Product line (vapes/e-liquids)</label>
+            <input
+              list="edit-product-line-suggestions"
+              value={productLine}
+              onChange={(e) => setProductLine(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              placeholder="e.g. BB 4000 Kit, Pulse Pods, Higo Salts"
+              autoComplete="off"
+            />
+            <datalist id="edit-product-line-suggestions">
+              {(PRODUCT_LINES_BY_BRAND[product.brand] ?? []).map((line) => (
+                <option key={line} value={line} />
+              ))}
+            </datalist>
+            <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+              Groups flavours under this line in the shop&apos;s brand drilldown. Clear to remove from the drilldown.
+            </p>
           </div>
           <div>
             <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Image URL</label>
