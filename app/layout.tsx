@@ -62,8 +62,8 @@ export default function RootLayout({
         <Providers>
           <ThemeProvider
             attribute="class"
-            defaultTheme="dark"
-            enableSystem
+            defaultTheme="light"
+            forcedTheme="light"
             disableTransitionOnChange
           >
             <div className="min-h-[100dvh] md:bg-slate-200">

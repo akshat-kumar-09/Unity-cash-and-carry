@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { brandInitials } from "@/lib/product-categories"
-import { brandLogoPrefersDarkTile, brandSlug, getBrandLogoCandidates } from "@/lib/brand-logos"
+import { brandLogoPrefersDarkTile, brandLogoScale, brandSlug, getBrandLogoCandidates } from "@/lib/brand-logos"
 
 /** Fixed slot + object-contain so tall/wide/wordmark assets align in the brand list */
 const LOGO_SHELL_BY_SIZE = {
@@ -35,6 +35,7 @@ export function BrandMark({ brand, size = "sm" }: { brand: string; size?: "xs" |
   const candidates = getBrandLogoCandidates(brand)
   const [idx, setIdx] = useState(0)
   const darkTile = brandLogoPrefersDarkTile(slug)
+  const scale = brandLogoScale(slug)
   const shell = LOGO_SHELL_BY_SIZE[size]
 
   if (idx >= candidates.length) {
@@ -60,6 +61,7 @@ export function BrandMark({ brand, size = "sm" }: { brand: string; size?: "xs" |
         src={src}
         alt=""
         className={`h-full w-full object-contain p-1 ${LOGO_MAX_H_BY_SIZE[size]} ${darkTile ? "brightness-[1.02]" : ""}`}
+        style={scale !== 1 ? { transform: `scale(${scale})` } : undefined}
         onError={() => setIdx((i) => i + 1)}
       />
     </span>

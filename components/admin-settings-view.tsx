@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { signOut } from "next-auth/react"
 import {
   Settings,
   Shield,
@@ -15,6 +16,8 @@ import {
   XCircle,
   Link2,
   Sparkles,
+  ChevronDown,
+  LogOut,
 } from "lucide-react"
 import { toast } from "sonner"
 import { AppScreenHeader } from "@/components/app-screen-header"
@@ -39,6 +42,10 @@ export function AdminSettingsView() {
   const [copySuccess, setCopySuccess] = useState(false)
   const [replayEmail, setReplayEmail] = useState("")
   const [replaying, setReplaying] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
+  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" })
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwError, setPwError] = useState("")
 
   const fetchSettingsAndTokens = async () => {
     try {
@@ -142,6 +149,43 @@ export function AdminSettingsView() {
       toast.error(e instanceof Error ? e.message : "Failed to reset welcome build")
     } finally {
       setReplaying(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    setPwError("")
+    if (!pwForm.currentPassword || !pwForm.newPassword) {
+      setPwError("Please fill in both password fields.")
+      return
+    }
+    if (pwForm.newPassword.length < 8) {
+      setPwError("New password must be at least 8 characters.")
+      return
+    }
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      setPwError("New password and confirmation don't match.")
+      return
+    }
+
+    setPwSaving(true)
+    try {
+      const res = await fetch("/api/account/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: pwForm.currentPassword,
+          newPassword: pwForm.newPassword,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to change password")
+
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" })
+      toast.success("Password changed successfully")
+    } catch (e) {
+      setPwError(e instanceof Error ? e.message : "Failed to change password")
+    } finally {
+      setPwSaving(false)
     }
   }
 
@@ -374,6 +418,72 @@ export function AdminSettingsView() {
                 </div>
               )}
             </div>
+
+            {/* Change Password */}
+            <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setPasswordOpen((o) => !o)}
+                aria-expanded={passwordOpen}
+                className="unity-tap flex w-full items-center gap-2 px-5 py-4 text-left"
+              >
+                <KeyRound className="h-4.5 w-4.5 text-blue-600 shrink-0" />
+                <span className="flex-1 text-[15px] font-black text-slate-900 tracking-tight">Change Password</span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${passwordOpen ? "rotate-180" : ""}`} />
+              </button>
+              {passwordOpen && (
+                <div className="border-t border-slate-100 px-5 py-4 space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Current Password</label>
+                    <input
+                      type="password"
+                      value={pwForm.currentPassword}
+                      onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
+                      placeholder="Your current password"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">New Password</label>
+                    <input
+                      type="password"
+                      value={pwForm.newPassword}
+                      onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
+                      placeholder="At least 8 characters"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Confirm New Password</label>
+                    <input
+                      type="password"
+                      value={pwForm.confirmPassword}
+                      onChange={(e) => setPwForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                      placeholder="Repeat new password"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  {pwError && <p className="text-[12px] font-semibold text-red-600">{pwError}</p>}
+                  <button
+                    onClick={handleChangePassword}
+                    disabled={pwSaving}
+                    className="w-full py-3 bg-blue-600 text-white font-bold text-sm uppercase tracking-wider rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-blue-600/20"
+                  >
+                    {pwSaving ? "Updating…" : "Update Password"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Sign Out */}
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="unity-tap flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3.5 text-[15px] font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
           </div>
         )}
       </main>

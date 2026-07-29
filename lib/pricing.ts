@@ -13,9 +13,9 @@ type TieredProduct = {
   casePriceB?: number | null
 }
 
-/** Tier A/B are optional per-SKU overrides — null/missing falls back to the base (Tier C) price. */
+/** Tier C/B are optional per-SKU overrides — null/missing falls back to the base (Tier A, casual/default) price. */
 export function resolveProductPrice(product: TieredProduct, tier: PriceTier): { unitPrice: number; casePrice: number } {
-  if (tier === "A" && product.unitPriceA != null && product.casePriceA != null) {
+  if (tier === "C" && product.unitPriceA != null && product.casePriceA != null) {
     return { unitPrice: product.unitPriceA, casePrice: product.casePriceA }
   }
   if (tier === "B" && product.unitPriceB != null && product.casePriceB != null) {

@@ -43,17 +43,11 @@ type Trader = {
 }
 
 const TIER_LABELS: Record<PriceTier, string> = {
-  A: "Tier A — Most valued",
+  A: "Tier A — Casual",
   B: "Tier B — Valued",
-  C: "Tier C — Casual",
+  C: "Tier C — Most valued",
 }
 
-/** Temp password is generated + stored in complianceNotes at registration time (see api/auth/register). */
-function extractTempPassword(notes: string | null): string | null {
-  if (!notes) return null
-  const match = notes.match(/Generated Temp Password:\s*([^\s\n]+)/)
-  return match ? match[1] : null
-}
 
 export function AdminComplianceView() {
   const [traders, setTraders] = useState<Trader[]>([])
@@ -63,6 +57,10 @@ export function AdminComplianceView() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTiers, setSelectedTiers] = useState<Record<string, PriceTier>>({})
   const [linkingId, setLinkingId] = useState<string | null>(null)
+  // Decrypted temp passwords, fetched on-demand per trader — never parsed/decrypted
+  // client-side (the key is server-only), and only for traders that actually have one
+  // on file so this doesn't decrypt everyone's password on every list load.
+  const [tempPasswords, setTempPasswords] = useState<Record<string, string | null>>({})
 
   const fetchTraders = async () => {
     try {
@@ -75,8 +73,26 @@ export function AdminComplianceView() {
       setSelectedTiers((prev) => {
         const next = { ...prev }
         for (const t of list) {
-          if (!(t.id in next)) next[t.id] = t.priceTier || "C"
+          if (!(t.id in next)) next[t.id] = t.priceTier || "A"
         }
+        return next
+      })
+
+      const candidates = list.filter((t) => t.complianceNotes?.includes("Generated Temp Password"))
+      const results = await Promise.all(
+        candidates.map(async (t) => {
+          try {
+            const r = await fetch(`/api/admin/compliance/temp-password?userId=${t.id}`)
+            const d = await r.json().catch(() => ({}))
+            return [t.id, r.ok ? (d.tempPassword ?? null) : null] as const
+          } catch {
+            return [t.id, null] as const
+          }
+        })
+      )
+      setTempPasswords((prev) => {
+        const next = { ...prev }
+        for (const [id, pw] of results) next[id] = pw
         return next
       })
     } catch (e) {
@@ -99,8 +115,12 @@ export function AdminComplianceView() {
         body: JSON.stringify({
           userId,
           complianceStatus: status,
-          complianceNotes: notes || `Updated to ${status} via Admin panel.`,
-          priceTier: status === "approved" ? selectedTiers[userId] || "C" : undefined,
+          // Only send an explicit note when one was actually provided — this used to
+          // always send a generic "Updated to X via Admin panel." string, which silently
+          // overwrote (and destroyed) the registration notes, including the encrypted
+          // temp password, on every single approve/block click.
+          ...(notes ? { complianceNotes: notes } : {}),
+          priceTier: status === "approved" ? selectedTiers[userId] || "A" : undefined,
         }),
       })
 
@@ -122,28 +142,57 @@ export function AdminComplianceView() {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.error || "Failed to generate invite link")
 
-    const portalUrl = typeof window !== "undefined" ? window.location.origin : ""
-    return `${portalUrl}/invite?token=${data.token}`
+    // Server-computed from APP_URL, not window.location.origin — an admin generating a
+    // real invite link while browsing a non-production alias (e.g. the old Preview
+    // domain) must never bake that alias into a link sent to a real retailer.
+    return data.link as string
+  }
+
+  /** One warm, complete message — works pasted as-is into WhatsApp, Telegram, SMS, or
+   *  email alike, so this isn't tied to any one channel. The link is genuinely one-time
+   *  (consumed the moment it's opened), so it's safe to send exactly as written. */
+  const buildWelcomeMessage = (trader: Trader, link: string, tempPassword: string | null) => {
+    const firstName = (trader.name || "there").split(" ")[0]
+    return [
+      `Hi ${firstName},`,
+      "",
+      "Welcome to Unity Cash & Carry — great to have you with us!",
+      "",
+      "Your trade account is approved and ready to go. Here's your one-time sign-in link — it only opens once, so tap it directly rather than forwarding it on:",
+      "",
+      link,
+      "",
+      `Login email: ${trader.email}`,
+      tempPassword ? `Temporary password: ${tempPassword}` : "",
+      "",
+      "Once you're in, you can browse our full wholesale range, place orders, and track everything from your phone. You can change your password any time from Account > Settings.",
+      "",
+      "Any questions at all, just get in touch — glad to have you on board.",
+      "",
+      "— Unity Cash & Carry",
+    ].filter((line) => line !== "").join("\n")
+  }
+
+  /** Always fetches fresh (never trusts a possibly-stale cache) — the temp password is
+   *  short-lived and decryption only ever happens server-side. */
+  const fetchTempPassword = async (userId: string): Promise<string | null> => {
+    const res = await fetch(`/api/admin/compliance/temp-password?userId=${userId}`)
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return null
+    return data.tempPassword ?? null
   }
 
   const handleCopyInviteLink = async (trader: Trader) => {
     setLinkingId(trader.id)
     try {
       const link = await generateInviteLink(trader)
-      const tempPassword = extractTempPassword(trader.complianceNotes)
+      const tempPassword = await fetchTempPassword(trader.id)
+      const message = buildWelcomeMessage(trader, link, tempPassword)
 
-      const clipboardText = tempPassword
-        ? `${link}\n\nEmail: ${trader.email}\nTemporary password: ${tempPassword}`
-        : link
-
-      await navigator.clipboard.writeText(clipboardText)
-      toast.success(
-        tempPassword
-          ? `Copied invite link + temp password for ${trader.email}`
-          : `Copied invite link for ${trader.email} (no temp password on file)`
-      )
+      await navigator.clipboard.writeText(message)
+      toast.success(`Welcome message copied for ${trader.email} — paste it into WhatsApp, Telegram, SMS, or email`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to copy invite link")
+      toast.error(e instanceof Error ? e.message : "Failed to copy welcome message")
     } finally {
       setLinkingId(null)
     }
@@ -153,22 +202,9 @@ export function AdminComplianceView() {
     setLinkingId(trader.id)
     try {
       const link = await generateInviteLink(trader)
-      const tempPassword = extractTempPassword(trader.complianceNotes)
-
-      const subject = "Your Unity Wholesale Trade Account is Approved"
-      const body = [
-        `Hi ${trader.name || "there"},`,
-        "",
-        "Your Unity Wholesale trade account has been approved. Use the one-time link below to sign in — it can only be used once, so open it directly rather than forwarding it.",
-        "",
-        `Login link: ${link}`,
-        `Email: ${trader.email}`,
-        tempPassword ? `Temporary password: ${tempPassword}` : "",
-        "",
-        "You can change your password any time from Account > Settings once logged in.",
-        "",
-        "Unity Cash & Carry",
-      ].filter(Boolean).join("\n")
+      const tempPassword = await fetchTempPassword(trader.id)
+      const body = buildWelcomeMessage(trader, link, tempPassword)
+      const subject = "Welcome to Unity Cash & Carry — your account is approved"
 
       const mailto = `mailto:${encodeURIComponent(trader.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
       window.location.href = mailto
@@ -402,7 +438,7 @@ export function AdminComplianceView() {
                             Price tier
                           </span>
                           <select
-                            value={selectedTiers[trader.id] || "C"}
+                            value={selectedTiers[trader.id] || "A"}
                             onChange={(e) =>
                               setSelectedTiers((prev) => ({ ...prev, [trader.id]: e.target.value as PriceTier }))
                             }
@@ -425,7 +461,7 @@ export function AdminComplianceView() {
                           ) : (
                             <LinkIcon className="h-3.5 w-3.5" />
                           )}
-                          Copy invite link
+                          Copy welcome message
                         </button>
                         <button
                           onClick={() => handleEmailInviteLink(trader)}
@@ -437,21 +473,24 @@ export function AdminComplianceView() {
                           ) : (
                             <Mail className="h-3.5 w-3.5" />
                           )}
-                          Send email
+                          Send via email
                         </button>
                       </div>
+                      <p className="pt-1.5 text-[10px] text-slate-400 leading-snug">
+                        "Copy welcome message" grabs the full warm greeting + one-time link + temp password as plain text — paste it into WhatsApp, Telegram, SMS, or anywhere else.
+                      </p>
 
-                      {extractTempPassword(trader.complianceNotes) && (
+                      {trader.id in tempPasswords && tempPasswords[trader.id] && (
                         <div className="flex items-center gap-1.5 pt-2 text-[11px]">
                           <KeyRound className="h-3.5 w-3.5 text-slate-300 shrink-0" />
                           <span className="text-slate-400 font-semibold">Temp password:</span>
                           <code className="font-mono font-bold text-slate-700">
-                            {extractTempPassword(trader.complianceNotes)}
+                            {tempPasswords[trader.id]}
                           </code>
                           <button
                             type="button"
                             onClick={() => {
-                              const pw = extractTempPassword(trader.complianceNotes)
+                              const pw = tempPasswords[trader.id]
                               if (pw) {
                                 navigator.clipboard.writeText(pw)
                                 toast.success("Password copied")

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Unity Assist</title>
+<style>
+  :root{
+    --unity-blue:#2563eb;
+    --unity-blue-dark:#1d4ed8;
+    --ink:#0f172a;
+    --slate:#475569;
+    --slate-light:#94a3b8;
+    --line:#e2e8f0;
+    --bg:#f8fafc;
+    --card:#ffffff;
+    --amber:#f59e0b;
+    --amber-bg:#fffbeb;
+    --emerald:#10b981;
+    --emerald-bg:#ecfdf5;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);
+    display:flex;justify-content:center;
+  }
+  .phone{
+    width:100%;max-width:430px;min-height:100vh;background:var(--bg);
+    display:flex;flex-direction:column;position:relative;overflow:hidden;
+  }
+
+  /* Header */
+  .hdr{
+    background:linear-gradient(135deg,var(--unity-blue) 0%,var(--unity-blue-dark) 100%);
+    padding:20px 20px 22px;color:#fff;position:relative;overflow:hidden;flex-shrink:0;
+  }
+  .hdr::after{content:'';position:absolute;top:-40%;right:-10%;width:180px;height:180px;
+    background:rgba(255,255,255,.08);border-radius:50%;}
+  .hdr-row{display:flex;align-items:center;gap:11px;position:relative;z-index:1;}
+  .hdr-badge{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.15);
+    display:flex;align-items:center;justify-content:center;font-size:20px;
+    border:1px solid rgba(255,255,255,.25);}
+  .hdr h1{font-size:19px;font-weight:800;letter-spacing:-.3px;line-height:1;}
+  .hdr .sub{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;
+    opacity:.8;margin-top:4px;}
+  .hdr .tagline{font-size:13px;font-weight:500;opacity:.92;margin-top:14px;line-height:1.5;
+    position:relative;z-index:1;max-width:92%;}
+
+  /* Search */
+  .search-wrap{padding:16px 20px 4px;flex-shrink:0;}
+  .search{
+    display:flex;align-items:center;gap:10px;background:var(--card);border:2px solid var(--line);
+    border-radius:14px;padding:12px 14px;transition:border-color .2s;
+  }
+  .search:focus-within{border-color:var(--unity-blue);}
+  .search svg{flex-shrink:0;}
+  .search input{border:none;outline:none;font-size:15px;width:100%;color:var(--ink);
+    background:transparent;font-family:inherit;}
+  .search input::placeholder{color:var(--slate-light);}
+
+  /* Scroll body */
+  .body{flex:1;overflow-y:auto;padding:8px 20px 28px;-webkit-overflow-scrolling:touch;}
+  .section-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.3px;
+    color:var(--slate-light);margin:18px 4px 10px;}
+
+  /* Topic buttons */
+  .topics{display:flex;flex-direction:column;gap:10px;}
+  .topic{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px 16px;
+    display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .18s;text-align:left;width:100%;
+    font-family:inherit;
+  }
+  .topic:active{transform:scale(.98);}
+  .topic:hover{border-color:var(--unity-blue);box-shadow:0 6px 18px -8px rgba(37,99,235,.25);}
+  .topic-icon{width:42px;height:42px;border-radius:11px;flex-shrink:0;display:flex;
+    align-items:center;justify-content:center;font-size:20px;background:#eff6ff;}
+  .topic-txt{flex:1;min-width:0;}
+  .topic-title{font-size:14.5px;font-weight:700;color:var(--ink);line-height:1.25;}
+  .topic-desc{font-size:12px;color:var(--slate);margin-top:3px;line-height:1.35;}
+  .topic-arrow{color:var(--slate-light);flex-shrink:0;}
+
+  /* Answer card (hidden by default) */
+  .answer{
+    background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;
+    margin-top:4px;animation:pop .25s cubic-bezier(.16,1,.3,1);
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+  .answer h2{font-size:17px;font-weight:800;letter-spacing:-.2px;margin-bottom:4px;
+    display:flex;align-items:center;gap:9px;}
+  .answer h2 .em{font-size:20px;}
+  .answer .updated{font-size:11px;color:var(--emerald);font-weight:700;background:var(--emerald-bg);
+    display:inline-block;padding:3px 9px;border-radius:20px;margin-bottom:14px;}
+  .answer p{font-size:14px;line-height:1.6;color:var(--slate);margin-bottom:12px;}
+  .answer p strong{color:var(--ink);font-weight:700;}
+  .answer ul{list-style:none;margin:0 0 12px;}
+  .answer li{font-size:14px;line-height:1.55;color:var(--slate);padding-left:22px;position:relative;
+    margin-bottom:8px;}
+  .answer li::before{content:'';position:absolute;left:4px;top:8px;width:6px;height:6px;
+    border-radius:50%;background:var(--unity-blue);}
+  .callout{background:var(--amber-bg);border:1px solid #fde68a;border-radius:12px;padding:12px 14px;
+    margin:14px 0 4px;display:flex;gap:10px;align-items:flex-start;}
+  .callout .ic{font-size:16px;flex-shrink:0;line-height:1.4;}
+  .callout p{font-size:12.5px;line-height:1.5;color:#92400e;margin:0;font-weight:500;}
+  .back{margin-top:16px;background:none;border:none;color:var(--unity-blue);font-weight:700;
+    font-size:13.5px;cursor:pointer;padding:8px 0;font-family:inherit;display:flex;align-items:center;gap:6px;}
+
+  /* Human handoff */
+  .handoff{margin-top:22px;background:var(--ink);border-radius:18px;padding:20px;color:#fff;}
+  .handoff h3{font-size:15px;font-weight:800;margin-bottom:5px;}
+  .handoff p{font-size:12.5px;opacity:.7;line-height:1.5;margin-bottom:14px;}
+  .handoff-btns{display:flex;gap:10px;}
+  .hbtn{flex:1;border:none;border-radius:12px;padding:12px;font-size:12.5px;font-weight:700;
+    cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;
+    transition:transform .15s;}
+  .hbtn:active{transform:scale(.96);}
+  .hbtn.wa{background:#25d366;color:#fff;}
+  .hbtn.email{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);}
+
+  .no-result{text-align:center;padding:30px 20px;color:var(--slate-light);}
+  .no-result .em{font-size:34px;display:block;margin-bottom:10px;}
+  .no-result p{font-size:13.5px;line-height:1.5;}
+  .hidden{display:none;}
+  .disclaimer{font-size:10.5px;color:var(--slate-light);text-align:center;line-height:1.5;
+    margin-top:24px;padding:0 10px;}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <div class="hdr">
+    <div class="hdr-row">
+      <div class="hdr-badge">💬</div>
+      <div>
+        <h1>Unity Assist</h1>
+        <div class="sub">Trade Support</div>
+      </div>
+    </div>
+    <div class="tagline">Quick answers on the new UK vape rules, compliance and your trade account — straight from the Unity team.</div>
+  </div>
+
+  <div class="search-wrap">
+    <div class="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" type="text" placeholder="Ask about rules, delivery, compliance…" oninput="filter()">
+    </div>
+  </div>
+
+  <div class="body" id="body">
+    <div class="section-label" id="lbl">Popular right now</div>
+    <div class="topics" id="topics"></div>
+
+    <div class="answer hidden" id="answer"></div>
+
+    <div class="handoff" id="handoff">
+      <h3>Still need a hand?</h3>
+      <p>Talk to the Unity trade team direct — we usually reply within the hour during trading times.</p>
+      <div class="handoff-btns">
+        <button class="hbtn wa" onclick="alert('Demo: opens WhatsApp to Unity')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.7 4.8-1.3A10 10 0 1 0 12 2Zm0 18a8 8 0 0 1-4-1.1l-.3-.2-2.8.7.8-2.7-.2-.3A8 8 0 1 1 12 20Z"/></svg>
+          WhatsApp
+        </button>
+        <button class="hbtn email" onclick="alert('Demo: opens email to Unity')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+          Email
+        </button>
+      </div>
+    </div>
+
+    <div class="disclaimer">Unity Assist gives general guidance to help you trade compliantly. It isn't legal advice — for formal rulings, contact Trading Standards or the Unity team.</div>
+  </div>
+
+</div>
+
+<script>
+const TOPICS = [
+  {
+    id:'ban', icon:'🚫', tag:'popular',
+    title:'Are disposable vapes still legal to sell?',
+    desc:'The single-use ban — what you can and can\'t stock',
+    keywords:'disposable single use ban banned illegal elf bar sell stock legal',
+    answer:{
+      em:'🚫', title:'Disposable vapes are banned',
+      updated:'Current — in force since 1 June 2025',
+      body:`<p><strong>Selling or supplying single-use (disposable) vapes has been illegal across the UK since 1 June 2025</strong> — that covers shops and online, and applies to nicotine and nicotine-free devices alike.</p>
+      <p><strong>What's still legal to sell:</strong></p>
+      <ul>
+        <li>Rechargeable devices that are also refillable, or take replaceable/prefilled pods</li>
+        <li>Prefilled pod kits (Elf Bar, Lost Mary, IVG etc. now sell reusable versions)</li>
+        <li>E-liquids, refill bottles, coils and pods</li>
+      </ul>
+      <p><strong>Rule of thumb:</strong> if it can't be recharged <em>and</em> can't be refilled or re-podded, it's a banned single-use device.</p>`,
+      callout:'Penalty for a first offence is a £200 on-the-spot fine plus stock seizure. Repeat offences can mean unlimited fines or prosecution.'
+    }
+  },
+  {
+    id:'weee', icon:'♻️', tag:'popular',
+    title:'Do I have to take back old vapes?',
+    desc:'Your WEEE recycling / take-back duty',
+    keywords:'recycle recycling weee take back takeback bin dispose battery waste',
+    answer:{
+      em:'♻️', title:'Yes — you must offer take-back',
+      updated:'Current WEEE duty for vape sellers',
+      body:`<p>If you sell vapes you're a "distributor" under the WEEE Regulations, which means <strong>you must accept vapes and vape parts back for recycling</strong> — used pods, coils and batteries included.</p>
+      <ul>
+        <li>Provide a vape recycling bin in-store</li>
+        <li>Store used devices safely — loose lithium batteries are a fire risk</li>
+        <li>Keep them out of general waste; arrange proper collection</li>
+      </ul>
+      <p>Unity can point you to compliant recycling partners if you need one set up.</p>`,
+      callout:'The Office for Product Safety & Standards can act against sellers with no safe recycling route. A recycling poster in-store also reassures customers.'
+    }
+  },
+  {
+    id:'age', icon:'🪪', tag:'popular',
+    title:'What are the age-check rules?',
+    desc:'Age of sale & Challenge 25',
+    keywords:'age 18 challenge 25 id proof minor underage verification sell young',
+    answer:{
+      em:'🪪', title:'18+ only, operate Challenge 25',
+      updated:'Current age-of-sale rules',
+      body:`<p><strong>All vape products — including nicotine-free — can only be sold to over-18s.</strong></p>
+      <ul>
+        <li>Run <strong>Challenge 25</strong>: if a customer looks under 25, ask for ID</li>
+        <li>Accept passport, driving licence or PASS-hologram ID</li>
+        <li>Online, you must age-verify before dispatch</li>
+        <li>Train staff and keep a refusals log</li>
+      </ul>`,
+      callout:'Selling to under-18s can bring fines up to £2,500. A visible Challenge 25 notice at the till helps protect your staff and your licence.'
+    }
+  },
+  {
+    id:'specs', icon:'📏', tag:'product',
+    title:'Nicotine strength & tank size limits',
+    desc:'What TPD-compliant products must meet',
+    keywords:'nicotine strength mg tank size ml limit tpd 20 2ml 10ml bottle',
+    answer:{
+      em:'📏', title:'The legal product limits',
+      updated:'TPD limits — current',
+      body:`<p>Any vape you stock has to sit inside the TPD limits:</p>
+      <ul>
+        <li><strong>Nicotine strength:</strong> max <strong>20 mg/ml</strong></li>
+        <li><strong>Tank / pod capacity:</strong> max <strong>2 ml</strong></li>
+        <li><strong>E-liquid bottles:</strong> max <strong>10 ml</strong> for nicotine-containing liquid</li>
+        <li>Products should be <strong>MHRA-notified</strong> — check the brand appears on the MHRA notified-products list</li>
+      </ul>
+      <p>Unity only supplies MHRA-registered, TPD-compliant lines, so anything in the catalogue is safe to stock.</p>`,
+      callout:'Not every new device on the market is automatically compliant — always confirm before buying from a new source. Unity does this check for you.'
+    }
+  },
+  {
+    id:'tax', icon:'💷', tag:'product',
+    title:'Is there a new vape tax coming?',
+    desc:'The 2026 e-liquid duty — plan ahead',
+    keywords:'tax duty 2026 price increase liquid vaping products duty october',
+    answer:{
+      em:'💷', title:'Vaping Products Duty — from Oct 2026',
+      updated:'Confirmed, starts 1 October 2026',
+      body:`<p>A new <strong>Vaping Products Duty</strong> is confirmed to start <strong>1 October 2026</strong>.</p>
+      <ul>
+        <li>It's set at <strong>£2.20 per 10 ml of e-liquid</strong></li>
+        <li>It applies to the <strong>liquid only</strong> — devices, coils and empty pods aren't taxed</li>
+        <li>Expect retail e-liquid prices to rise; plan margins and pricing now</li>
+      </ul>
+      <p>Unity will keep trade pricing as sharp as possible and give you notice ahead of the change.</p>`,
+      callout:'This is coming, not yet live. Good moment to talk to your customers early so the price change isn\'t a surprise later.'
+    }
+  },
+  {
+    id:'delivery', icon:'🚚', tag:'account',
+    title:'Delivery, damages & returns',
+    desc:'How your trade orders are handled',
+    keywords:'delivery order late damaged broken return refund shipping track dispatch',
+    answer:{
+      em:'🚚', title:'Orders, delivery & damages',
+      updated:'Unity trade terms',
+      body:`<p><strong>Tracking your order:</strong> open the <strong>Orders</strong> tab for live status and delivery updates on every trade order.</p>
+      <p><strong>Something arrived damaged?</strong></p>
+      <ul>
+        <li>Report it within <strong>48 hours</strong> of delivery</li>
+        <li>Keep the packaging and snap a photo of the damage</li>
+        <li>Tap "WhatsApp" below and send it over — we'll sort a replacement or credit</li>
+      </ul>
+      <p><strong>Free delivery</strong> applies on trade orders over £500 (ex VAT).</p>`,
+      callout:'For anything order-specific — "where\'s my order?" — the Orders tab has your live status, or message the team direct below.'
+    }
+  }
+];
+
+const topicsEl = document.getElementById('topics');
+const answerEl = document.getElementById('answer');
+const bodyEl   = document.getElementById('body');
+const lblEl    = document.getElementById('lbl');
+const handoffEl= document.getElementById('handoff');
+
+function renderTopics(list){
+  topicsEl.innerHTML = list.map(t=>`
+    <button class="topic" onclick="openAnswer('${t.id}')">
+      <div class="topic-icon">${t.icon}</div>
+      <div class="topic-txt">
+        <div class="topic-title">${t.title}</div>
+        <div class="topic-desc">${t.desc}</div>
+      </div>
+      <svg class="topic-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>
+    </button>`).join('');
+}
+
+function openAnswer(id){
+  const t = TOPICS.find(x=>x.id===id); if(!t) return;
+  const a = t.answer;
+  topicsEl.classList.add('hidden');
+  lblEl.classList.add('hidden');
+  document.getElementById('handoff').classList.remove('hidden');
+  answerEl.classList.remove('hidden');
+  answerEl.innerHTML = `
+    <h2><span class="em">${a.em}</span>${a.title}</h2>
+    <div class="updated">✓ ${a.updated}</div>
+    ${a.body}
+    ${a.callout ? `<div class="callout"><span class="ic">⚠️</span><p>${a.callout}</p></div>` : ''}
+    <button class="back" onclick="goHome()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>
+      All topics
+    </button>`;
+  bodyEl.scrollTop = 0;
+}
+
+function goHome(){
+  answerEl.classList.add('hidden');
+  answerEl.innerHTML='';
+  topicsEl.classList.remove('hidden');
+  lblEl.classList.remove('hidden');
+  document.getElementById('q').value='';
+  renderTopics(TOPICS);
+  lblEl.textContent='Popular right now';
+  bodyEl.scrollTop=0;
+}
+
+function filter(){
+  const q = document.getElementById('q').value.toLowerCase().trim();
+  answerEl.classList.add('hidden');
+  topicsEl.classList.remove('hidden');
+  lblEl.classList.remove('hidden');
+  if(!q){ renderTopics(TOPICS); lblEl.textContent='Popular right now'; return; }
+  const hits = TOPICS.filter(t=>(t.title+' '+t.desc+' '+t.keywords).toLowerCase().includes(q));
+  lblEl.textContent = hits.length ? 'Matches' : '';
+  if(hits.length){ renderTopics(hits); }
+  else{
+    topicsEl.innerHTML = `<div class="no-result"><span class="em">🔍</span><p>No quick answer for that yet.<br>Tap WhatsApp below and the Unity team will help you directly.</p></div>`;
+  }
+}
+
+renderTopics(TOPICS);
+</script>
+</body>
+</html>

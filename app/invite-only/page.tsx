@@ -65,7 +65,7 @@ export default function InviteOnlyPage() {
         </div>
 
         <p className="text-white/50 text-[10px] font-mono mt-8">
-          HMRC AWRS Registered • VAT Compliance Portal
+          VAT Registered • Trade Compliance Portal
         </p>
       </div>
     </div>

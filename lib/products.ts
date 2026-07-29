@@ -31,7 +31,7 @@ export type Product = {
   unitsPerPack: number
   unitPrice: number
   casePrice: number
-  /** Tier A/B wholesale overrides (admin-only view) — null/absent falls back to unitPrice/casePrice. */
+  /** Tier C/B wholesale overrides (admin-only view) — null/absent falls back to unitPrice/casePrice. */
   unitPriceA?: number | null
   casePriceA?: number | null
   unitPriceB?: number | null
@@ -39,6 +39,9 @@ export type Product = {
   /** Max cases per order for this product (enforced in cart + checkout). */
   maxQtyPerOrder?: number
   badge?: string | null
+  trendingOrder?: number | null
+  /** Suggested resale price per unit — null until admin sets a real one. */
+  retailPriceUnit?: number | null
   isActive?: boolean
   /** Product image URL. Use getProductImageUrl() for placeholder when missing. */
   imageUrl?: string | null

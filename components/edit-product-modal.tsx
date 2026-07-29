@@ -28,6 +28,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
   const [unitPriceAStr, setUnitPriceAStr] = useState("")
   const [casePriceBStr, setCasePriceBStr] = useState("")
   const [unitPriceBStr, setUnitPriceBStr] = useState("")
+  const [retailPriceUnitStr, setRetailPriceUnitStr] = useState("")
   const [unitsPerPackStr, setUnitsPerPackStr] = useState("")
   const [packLabel, setPackLabel] = useState("")
   const [maxQtyPerOrderStr, setMaxQtyPerOrderStr] = useState("")
@@ -49,6 +50,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
       setUnitPriceAStr(product.unitPriceA != null ? String(roundMoney(product.unitPriceA)) : "")
       setCasePriceBStr(product.casePriceB != null ? String(roundMoney(product.casePriceB)) : "")
       setUnitPriceBStr(product.unitPriceB != null ? String(roundMoney(product.unitPriceB)) : "")
+      setRetailPriceUnitStr(product.retailPriceUnit != null ? String(roundMoney(product.retailPriceUnit)) : "")
       setUnitsPerPackStr(String(product.unitsPerPack))
       setPackLabel(product.packLabel ?? "")
       setMaxQtyPerOrderStr(String(getEffectiveMaxQtyPerOrder(product)))
@@ -90,6 +92,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
         unitPriceA?: number | null
         casePriceB?: number | null
         unitPriceB?: number | null
+        retailPriceUnit?: number | null
         unitsPerPack?: number
         packLabel?: string
         maxQtyPerOrder?: number
@@ -149,10 +152,10 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
         return roundMoney(n)
       }
 
-      const caseA = parseOptionalTier(casePriceAStr, "Tier A case price")
+      const caseA = parseOptionalTier(casePriceAStr, "Tier C case price")
       if (caseA !== (product.casePriceA ?? null)) body.casePriceA = caseA
 
-      const unitA = parseOptionalTier(unitPriceAStr, "Tier A unit price")
+      const unitA = parseOptionalTier(unitPriceAStr, "Tier C unit price")
       if (unitA !== (product.unitPriceA ?? null)) body.unitPriceA = unitA
 
       const caseB = parseOptionalTier(casePriceBStr, "Tier B case price")
@@ -160,6 +163,9 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
 
       const unitB = parseOptionalTier(unitPriceBStr, "Tier B unit price")
       if (unitB !== (product.unitPriceB ?? null)) body.unitPriceB = unitB
+
+      const retailUnit = parseOptionalTier(retailPriceUnitStr, "Suggested retail price")
+      if (retailUnit !== (product.retailPriceUnit ?? null)) body.retailPriceUnit = retailUnit
 
       const upp = parseInt(unitsPerPackStr.replace(/\D/g, ""), 10)
       if (Number.isNaN(upp) || upp < 1) {
@@ -306,7 +312,7 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
             </div>
           </div>
           <p className="text-[10px] text-slate-500 leading-snug">
-            Cart totals use case price + VAT. Prices are stored ex. VAT. This is the Tier C (standard) price.
+            Cart totals use case price + VAT. Prices are stored ex. VAT. This is the Tier A (standard) price.
           </p>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3 space-y-2">
@@ -316,13 +322,13 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
-                  Tier A case (£)
+                  Tier C case (£)
                 </label>
                 <input type="text" inputMode="decimal" value={casePriceAStr} onChange={(e) => setCasePriceAStr(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono" placeholder="Leave blank" autoComplete="off" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
-                  Tier A unit (£)
+                  Tier C unit (£)
                 </label>
                 <input type="text" inputMode="decimal" value={unitPriceAStr} onChange={(e) => setUnitPriceAStr(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono" placeholder="Leave blank" autoComplete="off" />
               </div>
@@ -340,7 +346,25 @@ export function EditProductModal({ product, isOpen, onClose, onSuccess }: EditPr
               </div>
             </div>
             <p className="text-[9px] text-slate-400 leading-snug">
-              Tier A = most valued retailers, Tier B = valued retailers. Blank = they see the standard Tier C price above.
+              Tier C = most valued retailers, Tier B = valued retailers. Blank = they see the standard Tier A price above.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+              Suggested retail price, per unit (£)
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={retailPriceUnitStr}
+              onChange={(e) => setRetailPriceUnitStr(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+              placeholder="Leave blank to hide margin"
+              autoComplete="off"
+            />
+            <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+              What a retailer could realistically resell one unit for. Powers the margin projection shown in their cart — leave blank to hide it for this product.
             </p>
           </div>
 

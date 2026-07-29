@@ -4,6 +4,7 @@ import { createOrderSchema } from "@/lib/validations"
 import { auth } from "@/auth"
 import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
 import { resolveProductPrice, isPriceTier, type PriceTier } from "@/lib/pricing"
+import { VPD_EFFECTIVE_DATE } from "@/lib/unity-business"
 
 export async function GET(request: NextRequest) {
   try {
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(fullOrder, { status: 201 })
     }
 
-    const tier: PriceTier = user.role === "admin" ? "C" : isPriceTier(user.priceTier) ? user.priceTier : "C"
+    const tier: PriceTier = user.role === "admin" ? "A" : isPriceTier(user.priceTier) ? user.priceTier : "A"
 
     // Calculate totals (tier-resolved wholesale price — server-computed, never trusts client input)
     let subtotal = 0
@@ -138,14 +139,18 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Vaping Products Duty (VPD) — HMRC-confirmed rate is £2.20/10ml, but the duty itself
+    // isn't law until 1 October 2026. Don't charge it on orders placed before that date.
     let vapeDutyAmount = 0
-    for (const item of parsed.data.items) {
-      const product = products.find((p) => p.id === item.productId)!
-      if (product.isSubjectToVapeDuty) {
-        vapeDutyAmount += item.quantity * product.unitsPerPack * product.liquidVolumeMl * 0.22
+    if (new Date() >= VPD_EFFECTIVE_DATE) {
+      for (const item of parsed.data.items) {
+        const product = products.find((p) => p.id === item.productId)!
+        if (product.isSubjectToVapeDuty) {
+          vapeDutyAmount += item.quantity * product.unitsPerPack * product.liquidVolumeMl * 0.22
+        }
       }
+      vapeDutyAmount = Math.round(vapeDutyAmount * 100) / 100
     }
-    vapeDutyAmount = Math.round(vapeDutyAmount * 100) / 100
 
     // Apply promo code discount
     let discountAmount = 0
@@ -219,7 +224,8 @@ export async function POST(request: NextRequest) {
           customerName: user.name ?? undefined,
           customerEmail: user.email,
           customerPhone: parsed.data.customerPhone,
-          shippingAddress: parsed.data.shippingAddress,
+          fulfillmentMethod: parsed.data.fulfillmentMethod,
+          shippingAddress: parsed.data.fulfillmentMethod === "click_and_collect" ? null : parsed.data.shippingAddress,
           notes: parsed.data.notes,
           promoCode: parsed.data.promoCode?.toUpperCase().trim() ?? null,
           discountAmount,

@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const category = searchParams.get("category")
     const brand = searchParams.get("brand")
+    const productLine = searchParams.get("productLine")
     const search = searchParams.get("search")
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10))
     const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT), 10)))
@@ -48,6 +49,10 @@ export async function GET(request: NextRequest) {
       } else {
         where.brand = brand
       }
+    }
+
+    if (productLine) {
+      where.productLine = productLine
     }
 
     if (search?.trim()) {
@@ -111,7 +116,7 @@ export async function GET(request: NextRequest) {
     const sessionUser = session?.user as { id?: string; role?: string } | undefined
     let responseProducts = products
     if (sessionUser?.role !== "admin") {
-      let tier: PriceTier = "C"
+      let tier: PriceTier = "A"
       if (sessionUser?.id) {
         const dbUser = await prisma.user.findUnique({
           where: { id: sessionUser.id },

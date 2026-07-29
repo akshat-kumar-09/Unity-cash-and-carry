@@ -101,11 +101,11 @@ export function BulkEditProductsModal({
       return
     }
     if (casePriceA !== undefined && Number.isNaN(casePriceA)) {
-      setError("Tier A case price must be a positive number or left blank.")
+      setError("Tier C case price must be a positive number or left blank.")
       return
     }
     if (unitPriceA !== undefined && Number.isNaN(unitPriceA)) {
-      setError("Tier A unit price must be a positive number or left blank.")
+      setError("Tier C unit price must be a positive number or left blank.")
       return
     }
     if (casePriceB !== undefined && Number.isNaN(casePriceB)) {
@@ -277,13 +277,13 @@ export function BulkEditProductsModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase text-slate-600">
-                    Tier A case (£)
+                    Tier C case (£)
                   </label>
                   <input type="text" inputMode="decimal" value={casePriceAStr} onChange={(e) => setCasePriceAStr(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm" placeholder="Leave blank" autoComplete="off" />
                 </div>
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase text-slate-600">
-                    Tier A unit (£)
+                    Tier C unit (£)
                   </label>
                   <input type="text" inputMode="decimal" value={unitPriceAStr} onChange={(e) => setUnitPriceAStr(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm" placeholder="Leave blank" autoComplete="off" />
                 </div>

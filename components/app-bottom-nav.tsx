@@ -12,12 +12,16 @@ const traderTabs: { id: AppTab; label: string; icon: typeof Store }[] = [
   { id: "account", label: "Account", icon: User },
 ]
 
+// Admin has no separate Account tab — change password / sign out live in Admin Settings
+// instead, since the generic account page had little to offer an admin. In its place,
+// admin gets the trader-facing Rewards page (editable in place), so they always know
+// exactly what the live customer experience looks like. Admin moves to the end.
 const adminTabs: { id: AppTab; label: string; icon: typeof Store }[] = [
   { id: "shop", label: "Shop", icon: Store },
   { id: "orders", label: "Orders", icon: Package },
-  { id: "admin", label: "Admin", icon: Shield },
+  { id: "offers", label: "Rewards", icon: Tag },
   { id: "assist", label: "Assist", icon: HeartHandshake },
-  { id: "account", label: "Account", icon: User },
+  { id: "admin", label: "Admin", icon: Shield },
 ]
 
 type AppBottomNavProps = {

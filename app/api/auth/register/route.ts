@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { companyName, name, email, phone, address, postcode, vatNumber, businessType, reference } = body
 
-    if (!email || !companyName || !name || !vatNumber) {
+    if (!email || !companyName || !name) {
       return jsonResponse(
-        { error: "Email, Business Identity, Lead Name, and VAT Number are required" },
+        { error: "Email, Business Identity, and Lead Name are required" },
         400
       )
     }
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         email: email.toLowerCase(),
         name,
         companyName,
-        vatNumber,
+        vatNumber: typeof vatNumber === "string" && vatNumber.trim() ? vatNumber.trim() : null,
         postcode: typeof postcode === "string" && postcode.trim() ? postcode.trim() : null,
         password: hashedPassword,
         tradeCode,

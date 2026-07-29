@@ -121,8 +121,12 @@ function parseRrp(rrp: string): number {
 
 type SiblingStats = { unitPrice: number; casePrice: number; unitsPerPack: number; packLabel: string }
 
+/** Real product images 404 on the CDN as of 2026-07-22 (no real media on the site yet) — exclude until fixed. */
+const SKIP_BRANDS_NO_MEDIA = ['HAYATI', 'DOJO']
+
 async function main() {
   const catalogue = loadSourceCatalogue()
+  for (const b of SKIP_BRANDS_NO_MEDIA) delete catalogue[b]
 
   // Pre-compute Tier C pricing stats per brand+category from what's already in the DB
   // (the existing 512-product seed already has sensible per-line wholesale pricing).

@@ -79,7 +79,7 @@ export function ProductDetailModal({ product, isOpen, onClose, isAdmin = false, 
           {/* Compliance & Specifications */}
           <div className="flex flex-col gap-1.5">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-block px-1.5 py-0.5 bg-slate-100 text-slate-650 text-[9px] font-bold uppercase tracking-wider rounded border border-slate-200">
+              <span className="inline-block px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase tracking-wider rounded border border-slate-200">
                 {product.packLabel}
               </span>
               {product.isSubjectToVapeDuty ? (

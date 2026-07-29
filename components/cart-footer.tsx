@@ -1,23 +1,43 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Package, Truck, X, Trash2, CheckCircle, Minus, Plus, ArrowLeft } from "lucide-react"
+import { Package, Truck, Store, X, Trash2, CheckCircle, Minus, Plus, ArrowLeft, TrendingUp } from "lucide-react"
 import { useCart } from "@/lib/cart-context"
 import { useSession } from "next-auth/react"
 import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
 import { useBackHandler } from "@/lib/use-back-handler"
 import { usePulseOnCartAdded } from "@/lib/cart-feedback"
+import { UNITY_BUSINESS, VPD_EFFECTIVE_DATE } from "@/lib/unity-business"
+
+type FulfillmentMethod = "delivery" | "click_and_collect"
 
 type CheckoutFormData = {
+  fulfillmentMethod: FulfillmentMethod
   customerPhone: string
   shippingAddress: string
   notes: string
 }
 
 const initialForm: CheckoutFormData = {
+  fulfillmentMethod: "delivery",
   customerPhone: "",
   shippingAddress: "",
   notes: "",
+}
+
+/** Real margin math for one cart line — null when the product has no admin-set retail
+ *  price yet (honest-pending: never guesses a resale price). Wholesale cost uses the
+ *  actual case price paid; retail value is the suggested per-unit resale price times
+ *  every individual unit in the cases ordered. */
+function computeLineMargin(item: { product: { casePrice: number; unitsPerPack: number; retailPriceUnit?: number | null }; quantity: number }) {
+  const rrp = item.product.retailPriceUnit
+  if (!rrp || rrp <= 0) return null
+  const totalUnits = item.quantity * item.product.unitsPerPack
+  const wholesaleCost = item.product.casePrice * item.quantity
+  const retailValue = rrp * totalUnits
+  const profit = retailValue - wholesaleCost
+  const marginPct = retailValue > 0 ? (profit / retailValue) * 100 : 0
+  return { totalUnits, wholesaleCost, retailValue, profit, marginPct }
 }
 
 export function CartFooter() {
@@ -101,9 +121,12 @@ export function CartFooter() {
   const discountAmount = appliedPromo ? appliedPromo.discountAmount : 0
   const updatedSubtotal = Math.max(0, subtotal - discountAmount)
   
-  // Calculate live Vape Product Duty (VPD)
+  // Calculate live Vape Product Duty (VPD) — mirrors the order-creation gate in
+  // app/api/orders/route.ts: the duty isn't law until 1 Oct 2026, so the cart total
+  // shown pre-checkout must match what checkout will actually charge.
+  const vpdIsLive = new Date() >= VPD_EFFECTIVE_DATE
   const vapeDutyAmount = items.reduce((acc, item) => {
-    if (item.product.isSubjectToVapeDuty) {
+    if (vpdIsLive && item.product.isSubjectToVapeDuty) {
       const vol = item.product.liquidVolumeMl ?? 2.0
       return acc + item.quantity * item.product.unitsPerPack * vol * 0.22
     }
@@ -120,8 +143,28 @@ export function CartFooter() {
     return acc
   }, 0)
 
+  // Pre-Oct-1 FOMO nudge: shown whenever the cart has liquid subject to future duty,
+  // so retailers see the real coming cost increase without it silently inflating today's total.
+  const projectedDutyPreview = Math.round(totalLiquidVolumeMl * 0.22 * 100) / 100
+
   const updatedVat = Math.round((updatedSubtotal + roundedVapeDuty) * 0.2 * 100) / 100
   const preWalletTotal = Math.round((updatedSubtotal + roundedVapeDuty + updatedVat) * 100) / 100
+
+  // Aggregate margin projection — only counts lines where admin has actually set a
+  // retail price, so this never includes a guessed number.
+  const marginTotals = items.reduce(
+    (acc, item) => {
+      const m = computeLineMargin(item)
+      if (!m) return acc
+      acc.wholesaleCost += m.wholesaleCost
+      acc.retailValue += m.retailValue
+      acc.profit += m.profit
+      acc.linesWithData += 1
+      return acc
+    },
+    { wholesaleCost: 0, retailValue: 0, profit: 0, linesWithData: 0 }
+  )
+  const marginPct = marginTotals.retailValue > 0 ? (marginTotals.profit / marginTotals.retailValue) * 100 : 0
   const creditsToUse = useWalletCredits ? Math.min(walletBalance, preWalletTotal) : 0
   const finalTotal = Math.round((preWalletTotal - creditsToUse) * 100) / 100
 
@@ -145,9 +188,10 @@ export function CartFooter() {
     if (isSubmitting) return
     setFormError("")
 
-    const { customerPhone, shippingAddress, notes } = formData
-    if (!customerPhone.trim() || !shippingAddress.trim()) {
-      setFormError("Please fill in shipping address and phone.")
+    const { fulfillmentMethod, customerPhone, shippingAddress, notes } = formData
+    const isDelivery = fulfillmentMethod === "delivery"
+    if (!customerPhone.trim() || (isDelivery && !shippingAddress.trim())) {
+      setFormError(isDelivery ? "Please fill in shipping address and phone." : "Please fill in your phone number.")
       return
     }
 
@@ -158,8 +202,9 @@ export function CartFooter() {
           productId: item.product.id,
           quantity: item.quantity,
         })),
+        fulfillmentMethod,
         customerPhone: customerPhone.trim(),
-        shippingAddress: shippingAddress.trim(),
+        shippingAddress: isDelivery ? shippingAddress.trim() : undefined,
         notes: notes.trim() || undefined,
         promoCode: appliedPromo ? appliedPromo.code : undefined,
         useWalletCredits,
@@ -221,36 +266,20 @@ export function CartFooter() {
 
   return (
     <>
-      {/* Sticky Footer Bar — only once a real (non-gift) product is in the cart */}
+      {/* Sticky Footer Bar — only once a real (non-gift) product is in the cart.
+          Same rounded-pill shape/font treatment as the "Add N items" staging bar
+          (flavour-quick-add-list.tsx) so both floating cart CTAs read as one family. */}
       {hasRealItems && (
-        <div
-          className={`fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 bg-blue-700 border-t-2 border-blue-800/50 shadow-lg ${
-            cartPulsing ? "animate-cart-pulse" : ""
-          }`}
-        >
+        <div className="pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 flex justify-center px-3">
           <button
             type="button"
             onClick={openCart}
-            className="w-full px-4 py-3 flex items-center justify-between text-white"
+            className={`pointer-events-auto unity-tap flex w-full max-w-md items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-blue-900/20 transition-colors bg-blue-700 hover:bg-blue-800 ${
+              cartPulsing ? "animate-cart-pulse" : ""
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white flex items-center justify-center rounded">
-                <Package className="w-4 h-4 text-blue-700" />
-              </div>
-              <div className="text-left">
-                <p className="text-[10px] text-blue-100 font-mono uppercase">
-                  {totalItems} {totalItems === 1 ? "case" : "cases"}
-                </p>
-                <p className="text-sm font-bold text-white font-mono">
-                  {"£"}
-                  {finalTotal.toFixed(2)}
-                  {" inc. VAT"}
-                </p>
-              </div>
-            </div>
-            <span className="text-xs font-bold text-white uppercase tracking-wider">
-              View Order
-            </span>
+            <Package className="h-4 w-4" />
+            View Order — {totalItems} {totalItems === 1 ? "case" : "cases"} — £{finalTotal.toFixed(2)}
           </button>
         </div>
       )}
@@ -287,8 +316,9 @@ export function CartFooter() {
                 Order Placed
               </h3>
               <p className="text-sm text-slate-600 mt-2 text-center">
-                Your order has been confirmed. Estimated dispatch under 24
-                hours.
+                {formData.fulfillmentMethod === "click_and_collect"
+                  ? "Your order has been confirmed. We'll text you once it's ready to collect."
+                  : "Your order has been confirmed. Estimated dispatch under 24 hours."}
               </p>
               <div className="mt-6 flex items-center gap-2">
                 <span className="w-6 h-px bg-gradient-to-r from-transparent via-blue-400/50 to-transparent" />
@@ -316,6 +346,35 @@ export function CartFooter() {
                   </div>
                 )}
                 <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                    How do you want this order?
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, fulfillmentMethod: "delivery" }))}
+                      className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-xs font-bold uppercase tracking-wide transition-colors ${
+                        formData.fulfillmentMethod === "delivery"
+                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                      }`}
+                    >
+                      <Truck className="h-4 w-4" /> Delivery
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((p) => ({ ...p, fulfillmentMethod: "click_and_collect" }))}
+                      className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-xs font-bold uppercase tracking-wide transition-colors ${
+                        formData.fulfillmentMethod === "click_and_collect"
+                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                      }`}
+                    >
+                      <Store className="h-4 w-4" /> Click &amp; Collect
+                    </button>
+                  </div>
+                </div>
+                <div>
                   <label htmlFor="customerPhone" className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
                     Phone *
                   </label>
@@ -324,24 +383,41 @@ export function CartFooter() {
                     type="tel"
                     value={formData.customerPhone}
                     onChange={(e) => setFormData((p) => ({ ...p, customerPhone: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="07XXX XXXXXX"
                     required
                   />
                 </div>
-                <div>
-                  <label htmlFor="shippingAddress" className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
-                    Shipping address *
-                  </label>
-                  <textarea
-                    id="shippingAddress"
-                    value={formData.shippingAddress}
-                    onChange={(e) => setFormData((p) => ({ ...p, shippingAddress: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
-                    placeholder="Full address for delivery"
-                    required
-                  />
-                </div>
+                {formData.fulfillmentMethod === "delivery" ? (
+                  <div>
+                    <label htmlFor="shippingAddress" className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
+                      Shipping address *
+                    </label>
+                    <textarea
+                      id="shippingAddress"
+                      value={formData.shippingAddress}
+                      onChange={(e) => setFormData((p) => ({ ...p, shippingAddress: e.target.value }))}
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                      placeholder="Full address for delivery"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5">
+                    <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-blue-700">
+                      <Store className="h-3.5 w-3.5" /> Collect from
+                    </p>
+                    <p className="mt-1.5 text-sm font-semibold text-slate-800 leading-snug">
+                      {UNITY_BUSINESS.legalName}
+                    </p>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      {UNITY_BUSINESS.addressLines.join(", ")}
+                    </p>
+                    <p className="mt-1.5 text-xs text-slate-500">
+                      We'll text you on the number below once your order is ready to collect.
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label htmlFor="notes" className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">
                     Notes (optional)
@@ -350,7 +426,7 @@ export function CartFooter() {
                     id="notes"
                     value={formData.notes}
                     onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px]"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px]"
                     placeholder="Delivery instructions, etc."
                   />
                 </div>
@@ -382,53 +458,64 @@ export function CartFooter() {
                     {items.map((item) => {
                       const lineMax = getEffectiveMaxQtyPerOrder(item.product)
                       const lineAtMax = item.quantity >= lineMax
+                      const margin = computeLineMargin(item)
                       return (
-                      <div
-                        key={item.product.id}
-                        className="px-4 py-3 flex items-center gap-3"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] text-blue-700 font-bold font-mono uppercase">
-                            {item.product.brand}
-                          </p>
-                          <p className="text-sm font-bold text-slate-800 truncate">
-                            {item.product.name}
-                          </p>
-                          <p className="text-[10px] text-slate-500 font-mono">
-                            {item.product.packLabel}
+                      <div key={item.product.id} className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] text-blue-700 font-bold font-mono uppercase">
+                              {item.product.brand}
+                            </p>
+                            <p className="text-sm font-bold text-slate-800 truncate">
+                              {item.product.name}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-mono">
+                              {item.product.packLabel}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => removeItem(item.product.id)}
+                              className="w-9 h-9 bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors rounded"
+                              aria-label={`Remove one ${item.product.name}`}
+                            >
+                              <Minus className="w-4 h-4" strokeWidth={3} />
+                            </button>
+                            <span className="w-9 text-center font-mono font-bold text-slate-800 text-lg">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addItem(item.product)}
+                              disabled={lineAtMax}
+                              title={lineAtMax ? `Order limit: ${lineMax} case(s)` : undefined}
+                              className={`w-9 h-9 flex items-center justify-center transition-colors rounded ${
+                                lineAtMax
+                                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                  : "bg-blue-600 text-white hover:bg-blue-700"
+                              }`}
+                              aria-label={`Add one more ${item.product.name}`}
+                            >
+                              <Plus className="w-4 h-4" strokeWidth={3} />
+                            </button>
+                          </div>
+                          <p className="w-16 text-right text-sm font-bold font-mono text-slate-800">
+                            {"£"}
+                            {(item.product.casePrice * item.quantity).toFixed(2)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.product.id)}
-                            className="w-9 h-9 bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors rounded"
-                            aria-label={`Remove one ${item.product.name}`}
-                          >
-                            <Minus className="w-4 h-4" strokeWidth={3} />
-                          </button>
-                          <span className="w-9 text-center font-mono font-bold text-slate-800 text-lg">
-                            {item.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => addItem(item.product)}
-                            disabled={lineAtMax}
-                            title={lineAtMax ? `Order limit: ${lineMax} case(s)` : undefined}
-                            className={`w-9 h-9 flex items-center justify-center transition-colors rounded ${
-                              lineAtMax
-                                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                                : "bg-blue-600 text-white hover:bg-blue-700"
-                            }`}
-                            aria-label={`Add one more ${item.product.name}`}
-                          >
-                            <Plus className="w-4 h-4" strokeWidth={3} />
-                          </button>
-                        </div>
-                        <p className="w-16 text-right text-sm font-bold font-mono text-slate-800">
-                          {"£"}
-                          {(item.product.casePrice * item.quantity).toFixed(2)}
-                        </p>
+                        {margin && (
+                          <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-emerald-50 border border-emerald-100 px-2.5 py-1.5">
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700">
+                              <TrendingUp className="h-3 w-3 shrink-0" />
+                              Resell {margin.totalUnits} unit{margin.totalUnits === 1 ? "" : "s"} for ~£{margin.retailValue.toFixed(2)}
+                            </span>
+                            <span className="shrink-0 font-mono text-[11px] font-black text-emerald-700">
+                              +£{margin.profit.toFixed(2)} ({margin.marginPct.toFixed(0)}%)
+                            </span>
+                          </div>
+                        )}
                       </div>
                       )
                     })}
@@ -494,7 +581,7 @@ export function CartFooter() {
                       <div className="flex items-center justify-between py-1 bg-white border border-slate-150 rounded-xl px-3.5 py-2.5">
                         <div className="text-left">
                           <p className="text-xs font-bold text-slate-800">Use Wallet Credits</p>
-                          <p className="text-[10px] font-semibold text-slate-450">Available balance: £{walletBalance.toFixed(2)}</p>
+                          <p className="text-[10px] font-semibold text-slate-500">Available balance: £{walletBalance.toFixed(2)}</p>
                         </div>
                         <input
                           type="checkbox"
@@ -506,10 +593,27 @@ export function CartFooter() {
                     )}
                   </div>
 
+                  {/* Margin projection — only when at least one line has a real retail price set */}
+                  {marginTotals.linesWithData > 0 && (
+                    <div className="mx-4 mt-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
+                      <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                        <TrendingUp className="h-3.5 w-3.5" /> Your Potential Profit
+                      </p>
+                      <div className="mt-1.5 flex items-center justify-between">
+                        <span className="text-[11px] text-emerald-700/80">
+                          Resell for ~£{marginTotals.retailValue.toFixed(2)} · you pay £{marginTotals.wholesaleCost.toFixed(2)}
+                        </span>
+                        <span className="font-mono text-sm font-black text-emerald-700">
+                          +£{marginTotals.profit.toFixed(2)} ({marginPct.toFixed(0)}%)
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* VAT Breakdown */}
-                  <div className="px-4 py-3 flex flex-col gap-1.5">
+                  <div className="px-4 py-3 flex flex-col gap-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500 uppercase font-mono">
+                      <span className="text-xs text-slate-500 uppercase font-bold tracking-wide">
                         Subtotal (ex. VAT)
                       </span>
                       <span className="text-sm font-mono font-bold text-slate-800">
@@ -519,7 +623,7 @@ export function CartFooter() {
 
                     {discountAmount > 0 && (
                       <div className="flex items-center justify-between text-emerald-600">
-                        <span className="text-xs uppercase font-mono font-bold">
+                        <span className="text-xs uppercase font-bold tracking-wide">
                           Promo Discount
                         </span>
                         <span className="text-sm font-mono font-bold">
@@ -528,20 +632,29 @@ export function CartFooter() {
                       </div>
                     )}
 
+                    {!vpdIsLive && totalLiquidVolumeMl > 0 && (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 my-1">
+                        <TrendingUp className="h-3.5 w-3.5 text-amber-700 mt-0.5 shrink-0" />
+                        <p className="text-[11px] font-semibold text-amber-800 leading-snug">
+                          Vaping Products Duty adds ~£{projectedDutyPreview.toFixed(2)} to this basket from 1 Oct 2026 (£2.20/10ml). Stock up now at today&apos;s price.
+                        </p>
+                      </div>
+                    )}
+
                     {roundedVapeDuty > 0 && (
                       <>
                         {totalLiquidVolumeMl > 0 && (
                           <div className="flex items-center justify-between text-slate-500">
-                            <span className="text-xs uppercase font-mono font-semibold">
+                            <span className="text-xs uppercase font-bold tracking-wide">
                               Total E-Liquid Volume
                             </span>
-                            <span className="text-sm font-mono font-semibold">
+                            <span className="text-sm font-mono font-bold">
                               {totalLiquidVolumeMl.toLocaleString()} ml
                             </span>
                           </div>
                         )}
                         <div className="flex items-center justify-between text-amber-700">
-                          <span className="text-xs uppercase font-mono font-bold">
+                          <span className="text-xs uppercase font-bold tracking-wide">
                             Vaping Products Duty
                           </span>
                           <span className="text-sm font-mono font-bold">
@@ -552,17 +665,17 @@ export function CartFooter() {
                     )}
 
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500 uppercase font-mono">
+                      <span className="text-xs text-slate-500 uppercase font-bold tracking-wide">
                         VAT (20% inc. Duty)
                       </span>
-                      <span className="text-sm font-mono text-slate-700">
+                      <span className="text-sm font-mono font-bold text-slate-800">
                         £{updatedVat.toFixed(2)}
                       </span>
                     </div>
 
                     {creditsToUse > 0 && (
                       <div className="flex items-center justify-between text-blue-600">
-                        <span className="text-xs uppercase font-mono font-bold">
+                        <span className="text-xs uppercase font-bold tracking-wide">
                           Credits Applied
                         </span>
                         <span className="text-sm font-mono font-bold">
@@ -571,11 +684,11 @@ export function CartFooter() {
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-200">
-                      <span className="text-sm font-bold text-slate-800 uppercase">
+                    <div className="flex items-center justify-between pt-3 mt-1 border-t-2 border-slate-800">
+                      <span className="text-sm font-black text-slate-900 uppercase tracking-wide">
                         Total
                       </span>
-                      <span className="text-xl font-bold font-mono text-blue-700">
+                      <span className="text-2xl font-black font-mono text-blue-700">
                         £{finalTotal.toFixed(2)}
                       </span>
                     </div>

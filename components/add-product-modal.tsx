@@ -32,6 +32,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
     casePriceA: 0,
     unitPriceB: 0,
     casePriceB: 0,
+    retailPriceUnit: 0,
     maxQtyPerOrder: 100,
     badge: "",
     imageUrl: "",
@@ -45,7 +46,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
     if (type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked
       setForm((p) => ({ ...p, [name]: checked }))
-    } else if (name === "unitsPerPack" || name === "unitPrice" || name === "casePrice" || name === "unitPriceA" || name === "casePriceA" || name === "unitPriceB" || name === "casePriceB" || name === "maxQtyPerOrder" || name === "liquidVolumeMl" || name === "nicotineStrengthMg") {
+    } else if (name === "unitsPerPack" || name === "unitPrice" || name === "casePrice" || name === "unitPriceA" || name === "casePriceA" || name === "unitPriceB" || name === "casePriceB" || name === "retailPriceUnit" || name === "maxQtyPerOrder" || name === "liquidVolumeMl" || name === "nicotineStrengthMg") {
       const num = parseFloat(value) || 0
       setForm((p) => ({ ...p, [name]: num }))
     } else {
@@ -72,6 +73,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
         casePriceA: form.casePriceA > 0 ? form.casePriceA : undefined,
         unitPriceB: form.unitPriceB > 0 ? form.unitPriceB : undefined,
         casePriceB: form.casePriceB > 0 ? form.casePriceB : undefined,
+        retailPriceUnit: form.retailPriceUnit > 0 ? form.retailPriceUnit : undefined,
       }
       const res = await fetch("/api/products", {
         method: "POST",
@@ -95,6 +97,7 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
         casePriceA: 0,
         unitPriceB: 0,
         casePriceB: 0,
+        retailPriceUnit: 0,
         maxQtyPerOrder: 100,
         badge: "",
         imageUrl: "",
@@ -250,15 +253,15 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3 space-y-2">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              Tier pricing (optional — Unit £/Case £ above is Tier C, the standard price)
+              Tier pricing (optional — Unit £/Case £ above is Tier A, the standard price)
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tier A unit £</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tier C unit £</label>
                 <input name="unitPriceA" type="number" step="0.01" min={0} value={form.unitPriceA || ""} onChange={handleChange} placeholder="Leave blank" className="w-full px-3 py-2 border border-slate-200 rounded text-sm" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tier A case £</label>
+                <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Tier C case £</label>
                 <input name="casePriceA" type="number" step="0.01" min={0} value={form.casePriceA || ""} onChange={handleChange} placeholder="Leave blank" className="w-full px-3 py-2 border border-slate-200 rounded text-sm" />
               </div>
               <div>
@@ -270,8 +273,13 @@ export function AddProductModal({ isOpen, onClose, onSuccess }: AddProductModalP
                 <input name="casePriceB" type="number" step="0.01" min={0} value={form.casePriceB || ""} onChange={handleChange} placeholder="Leave blank" className="w-full px-3 py-2 border border-slate-200 rounded text-sm" />
               </div>
             </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-600 mb-1">Suggested retail price, per unit £</label>
+              <input name="retailPriceUnit" type="number" step="0.01" min={0} value={form.retailPriceUnit || ""} onChange={handleChange} placeholder="Leave blank to hide margin" className="w-full px-3 py-2 border border-slate-200 rounded text-sm" />
+              <p className="mt-1 text-[9px] text-slate-400 leading-snug">Powers the margin projection shown in the retailer's cart. Leave blank to hide it for this product.</p>
+            </div>
             <p className="text-[9px] text-slate-400 leading-snug">
-              Tier A = most valued retailers, Tier B = valued retailers. Blank = they see the standard Tier C price above.
+              Tier C = most valued retailers, Tier B = valued retailers. Blank = they see the standard Tier A price above.
             </p>
           </div>
 

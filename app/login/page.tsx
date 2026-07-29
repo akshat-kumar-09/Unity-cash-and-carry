@@ -28,17 +28,27 @@ function LoginPageContent() {
       try {
         const res = await fetch("/api/settings/invite-gate")
         const data = await res.json()
-        
+
         if (data.inviteOnlyGate) {
           const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-          const hasBypassParam = searchParams.get("bypass") === "admin"
-          
-          if (hasBypassParam) {
-            document.cookie = "unity_invite_bypass=true; path=/; max-age=2592000; secure; samesite=lax"
+          const bypassCode = searchParams.get("bypass")
+
+          // The actual secret check happens server-side (ADMIN_BYPASS_SECRET never ships
+          // to the browser) — a plain client-side string comparison here would be
+          // readable straight out of devtools and defeat the gate entirely.
+          if (bypassCode) {
+            try {
+              const bypassRes = await fetch(`/api/settings/invite-bypass?code=${encodeURIComponent(bypassCode)}`)
+              if (!bypassRes.ok) {
+                // Wrong/missing code — fall through to the normal cookie check below.
+              }
+            } catch {
+              // ignore, falls through to the cookie check
+            }
           }
 
           const hasBypass = document.cookie.split(";").some((c) => c.trim().startsWith("unity_invite_bypass="))
-          
+
           if (!hasBypass && !isLocal) {
             router.replace("/invite-only")
             return

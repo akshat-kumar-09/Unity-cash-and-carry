@@ -73,10 +73,10 @@ export const SHOP_CATEGORIES: ShopCategoryDef[] = [
   { id: "gift_sets", label: "Gift sets", keywords: "Bundles • retail packs", status: "coming_soon", drilldown: "none" },
   { id: "bundles", label: "Bundles", keywords: "Multi-buy • case deals", status: "coming_soon", drilldown: "none" },
   { id: "clearance", label: "Clearance", keywords: "Reduced • last chance", status: "coming_soon", drilldown: "none" },
-  { id: "papers", label: "Papers", keywords: "Rolling • king • slim", status: "active", drilldown: "brand_only" },
-  { id: "filters", label: "Filters", keywords: "Tips • slim • carbon", status: "active", drilldown: "brand_only" },
-  { id: "lighters_fire", label: "Lighters & fire", keywords: "Torch • classic • impulse", status: "active", drilldown: "brand_only" },
-  { id: "other", label: "Other", keywords: "Catch-all • misc • spare parts", status: "active", drilldown: "brand_only" },
+  { id: "papers", label: "Papers", keywords: "Rolling • king • slim", status: "coming_soon", drilldown: "brand_only" },
+  { id: "filters", label: "Filters", keywords: "Tips • slim • carbon", status: "coming_soon", drilldown: "brand_only" },
+  { id: "lighters_fire", label: "Lighters & fire", keywords: "Torch • classic • impulse", status: "coming_soon", drilldown: "brand_only" },
+  { id: "other", label: "Other", keywords: "Catch-all • misc • spare parts", status: "coming_soon", drilldown: "brand_only" },
 ]
 
 export const VAPING_BRANDS = [
@@ -85,9 +85,24 @@ export const VAPING_BRANDS = [
   "Elf Bar",
   "Lost Mary",
   "SKE",
+  "Pixl",
+  "Hyola",
 ] as const
 
 export type VapingBrand = (typeof VAPING_BRANDS)[number]
+
+/** Brands with a real e-liquid/salts line in the catalogue — used for the "E-liquids"
+ *  category brand picker. Pixl and Hyola are hardware/disposable-only brands right now
+ *  (no e-liquid product), so they're deliberately excluded here (would otherwise show
+ *  an empty brand tile with zero products behind it). Add a brand here only once it has
+ *  an actual e-liquid line in `PRODUCT_LINES_BY_BRAND`. */
+export const E_LIQUID_BRANDS = [
+  "Higo",
+  "IVG",
+  "Elf Bar",
+  "Lost Mary",
+  "SKE",
+] as const
 
 /** Real per-brand product lines from the site catalogue — used as a filter once a brand is picked while browsing. */
 export const PRODUCT_LINES_BY_BRAND: Record<string, string[]> = {
@@ -96,6 +111,8 @@ export const PRODUCT_LINES_BY_BRAND: Record<string, string[]> = {
   SKE: ["Bar 15K", "Crystal Bar", "4in1", "Salts"],
   IVG: ["2400", "Pro", "Smart Max", "Smart Max Refills", "IVG Salts", "2400 Pods"],
   Higo: ["BB 4000 Kit", "BB 4000 Pods", "Alfa Pro Kit", "Pulse Kit", "Pulse Pods", "Higo Salts"],
+  Pixl: ["PIXL 8000", "Pod XL"],
+  Hyola: ["Hyola 8K", "Hyola 8K Pods", "Hyola Ultra", "Hyola Ultra Pods"],
 }
 
 /** API sort priority (lower = first) */

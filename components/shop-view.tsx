@@ -91,6 +91,8 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
           <ShopCategoryAccordion
             search={search}
             onNavigate={({ categorySlug }) => setSelectedCategorySlug(categorySlug)}
+            isAdmin={isAdmin}
+            onProductUpdated={onProductAdded}
           />
         ) : (
           <>

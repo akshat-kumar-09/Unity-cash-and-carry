@@ -42,9 +42,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
+    // If a still-valid, unused token already exists for this email, hand back that
+    // SAME one instead of rotating it. Without this, clicking "Copy invite link" and
+    // then "Send email" (or clicking either twice) silently invalidates whichever link
+    // was generated first — anyone who already has that link now hits "expired/invalid"
+    // even though it was never used.
+    const portalUrl = process.env.APP_URL || "https://app.unitywholesale.co.uk"
+
+    const existing = await prisma.inviteToken.findUnique({ where: { email: email.toLowerCase() } })
+    if (existing && !existing.used && existing.expiresAt > new Date()) {
+      return NextResponse.json({ ...existing, link: `${portalUrl}/invite?token=${existing.token}` })
+    }
+
     // Generate a secure random token
     const token = crypto.randomBytes(16).toString("hex")
-    
+
     // Expires in 48 hours
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 48)
@@ -66,7 +78,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(invite)
+    return NextResponse.json({ ...invite, link: `${portalUrl}/invite?token=${invite.token}` })
   } catch (error) {
     console.error("Error creating invite token:", error)
     return NextResponse.json({ error: "Failed to create invite token" }, { status: 500 })

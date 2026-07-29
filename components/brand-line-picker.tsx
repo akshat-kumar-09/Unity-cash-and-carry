@@ -16,12 +16,14 @@ type BrandLineRowsProps = {
   categorySlug: ProductCategorySlug
   brand: string
   search: string
+  isAdmin?: boolean
+  onProductUpdated?: () => void
 }
 
 /** Nested inside an expanded brand row (Vaping/E-liquids): fetches that brand's real
  *  product lines and renders them as its own single-open accordion — tapping a line
  *  expands straight into its flavour quick-add rows, no screen navigation involved. */
-export function BrandLinePicker({ categorySlug, brand, search }: BrandLineRowsProps) {
+export function BrandLinePicker({ categorySlug, brand, search, isAdmin = false, onProductUpdated }: BrandLineRowsProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [openLine, setOpenLine] = useState<string | null>(null)
@@ -122,6 +124,8 @@ export function BrandLinePicker({ categorySlug, brand, search }: BrandLineRowsPr
                   brand={brand}
                   productLine={line}
                   search={search}
+                  isAdmin={isAdmin}
+                  onProductUpdated={onProductUpdated}
                 />
               </div>
             )}

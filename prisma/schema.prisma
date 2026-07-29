@@ -17,8 +17,8 @@ model User {
   password      String
   tradeCode     String?   @unique
   role          String    @default("customer") // admin, trader, customer, rep
-  /// Wholesale pricing tier: "A" (most valued), "B" (valued), "C" (casual/default)
-  priceTier     String    @default("C")
+  /// Wholesale pricing tier: "A" (casual/default), "B" (valued), "C" (most valued/best price)
+  priceTier     String    @default("A")
   walletBalance Float     @default(0.00)
   // HMRC Compliance — retailers must be verified before ordering
   vatNumber              String?
@@ -68,6 +68,13 @@ model Product {
   /// Max cases of this SKU a customer can order per line (wholesale cap).
   maxQtyPerOrder Int      @default(100)
   badge         String?
+  /// Manual sort position among featured ("badge" set) products on the "What's Selling"
+  /// shelf — lower sorts first. Null falls back to updatedAt ordering.
+  trendingOrder Int?
+  /// Suggested retail (resale) price per single unit — what the retailer could sell this
+  /// for to their own customer. Null until admin sets a real one (no invented RRPs); the
+  /// cart's margin projection only shows for products where this is actually set.
+  retailPriceUnit Float?
   imageUrl      String?
   isActive      Boolean   @default(true)
   /// Whether this product should appear in shop browse/search results. Distinct from
@@ -103,6 +110,8 @@ model Order {
   customerEmail   String?
   customerPhone   String?
   shippingAddress String?
+  // "delivery" (shippingAddress required) | "click_and_collect" (collect from the Glasgow depot, shippingAddress unused)
+  fulfillmentMethod String @default("delivery")
   notes           String?
   promoCode          String?
   discountAmount     Float @default(0.00)
@@ -151,6 +160,28 @@ model PromoCode {
   minOrderValue Float    @default(0.00)
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
+}
+
+model PromoBanner {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  altText   String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DepotPerk {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  /// Key into a small fixed icon map on the frontend (e.g. "gift", "truck", "shield").
+  icon        String
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model StockSubscription {

@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
-    const { name, description, imageUrl, productLine, unitPrice, casePrice, unitPriceA, casePriceA, unitPriceB, casePriceB, unitsPerPack, packLabel, maxQtyPerOrder, liquidVolumeMl, isSubjectToVapeDuty, nicotineStrengthMg } = parsed.data
+    const { name, description, imageUrl, productLine, unitPrice, casePrice, unitPriceA, casePriceA, unitPriceB, casePriceB, unitsPerPack, packLabel, maxQtyPerOrder, liquidVolumeMl, isSubjectToVapeDuty, nicotineStrengthMg, badge, trendingOrder, retailPriceUnit } = parsed.data
     const data: {
       name?: string
       description?: string
@@ -42,6 +42,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       liquidVolumeMl?: number
       isSubjectToVapeDuty?: boolean
       nicotineStrengthMg?: number
+      badge?: string | null
+      trendingOrder?: number | null
+      retailPriceUnit?: number | null
     } = {}
     if (name !== undefined) data.name = name
     if (description !== undefined) data.description = description.trim()
@@ -63,6 +66,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (liquidVolumeMl !== undefined) data.liquidVolumeMl = liquidVolumeMl
     if (isSubjectToVapeDuty !== undefined) data.isSubjectToVapeDuty = isSubjectToVapeDuty
     if (nicotineStrengthMg !== undefined) data.nicotineStrengthMg = nicotineStrengthMg
+    if (badge !== undefined) data.badge = badge === "" || badge === null ? null : badge.trim()
+    if (trendingOrder !== undefined) data.trendingOrder = trendingOrder
+    if (retailPriceUnit !== undefined) data.retailPriceUnit = retailPriceUnit
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "Nothing to update" }, { status: 400 })

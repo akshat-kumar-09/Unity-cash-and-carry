@@ -22,6 +22,7 @@ import { AdminPricingView } from "@/components/admin-pricing-view"
 import { AdminReportsView } from "@/components/admin-reports-view"
 import { AdminSettingsView } from "@/components/admin-settings-view"
 import { WelcomeBuild } from "@/components/welcome-build/welcome-build"
+import { UnityAssistWidget } from "@/components/unity-assist-widget"
 
 type OnboardingProfile = {
   name: string | null
@@ -122,6 +123,7 @@ function AppShell() {
       {activeTab === "admin" && isAdmin && <AdminView />}
 
       <AppBottomNav activeTab={activeTab} onTabChange={setActiveTab} isAdmin={isAdmin} />
+      <UnityAssistWidget />
     </div>
   )
 }
@@ -171,10 +173,11 @@ function HomeContent() {
 
   const role = (session.user as { role?: string })?.role
   const isAdmin = role === "admin"
-  // The welcome build is a retailer's first-login moment — admin/rep accounts (internal
-  // tooling logins, not onboarded trade partners) skip it entirely.
-  const isRetailer = role === "customer" || role === "trader"
-  const needsWelcomeBuild = isRetailer && profile != null && !profile.welcomeGameCompletedAt
+  // welcomeGameCompletedAt is the sole gate now (role-independent) — real accounts of any
+  // role only ever have it null before their actual first login or after an explicit
+  // "Replay Welcome Build" from Admin Settings, so admin/rep accounts don't see this
+  // unprompted; it only shows when someone deliberately triggers a replay for demos.
+  const needsWelcomeBuild = profile != null && !profile.welcomeGameCompletedAt
 
   if (needsWelcomeBuild && profile) {
     return (

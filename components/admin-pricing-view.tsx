@@ -100,7 +100,7 @@ function LineCard({ group, onSaved }: { group: LineGroup; onSaved: () => void })
       <div className="border-t border-slate-100 px-4 py-3.5 space-y-3">
         <div className="grid grid-cols-3 gap-2.5">
           <div>
-            <label className="mb-1 block text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Tier C</label>
+            <label className="mb-1 block text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Tier A</label>
             <input
               type="text"
               inputMode="decimal"
@@ -110,7 +110,7 @@ function LineCard({ group, onSaved }: { group: LineGroup; onSaved: () => void })
             />
           </div>
           <div>
-            <label className="mb-1 block text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Tier A</label>
+            <label className="mb-1 block text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Tier C</label>
             <input
               type="text"
               inputMode="decimal"

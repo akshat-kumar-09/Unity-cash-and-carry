@@ -10,6 +10,7 @@ import {
 import {
   SHOP_CATEGORIES,
   VAPING_BRANDS,
+  E_LIQUID_BRANDS,
   POUCH_BRANDS,
   type ProductCategorySlug,
 } from "@/lib/product-categories"
@@ -26,6 +27,8 @@ export type ShopNavigatePayload = {
 type ShopCategoryAccordionProps = {
   onNavigate: (payload: ShopNavigatePayload) => void
   search: string
+  isAdmin?: boolean
+  onProductUpdated?: () => void
 }
 
 function BrandRow({
@@ -110,6 +113,8 @@ function BrandDrilldownCard({
   mode,
   defaultOpen = false,
   search,
+  isAdmin,
+  onProductUpdated,
 }: {
   def: (typeof SHOP_CATEGORIES)[number]
   /** Omit to derive the brand list live from the catalogue instead of a fixed roster. */
@@ -117,6 +122,8 @@ function BrandDrilldownCard({
   mode: "brand_then_line" | "brand_only"
   defaultOpen?: boolean
   search: string
+  isAdmin?: boolean
+  onProductUpdated?: () => void
 }) {
   const [expanded, setExpanded] = useState(defaultOpen)
   const [openBrand, setOpenBrand] = useState<string | null>(null)
@@ -176,10 +183,22 @@ function BrandDrilldownCard({
                   {isOpen && (
                     mode === "brand_only" ? (
                       <div className="border-t border-dashed border-blue-100/90 p-1.5">
-                        <FlavourQuickAddList categorySlug={def.id} brand={brand} search={search} />
+                        <FlavourQuickAddList
+                          categorySlug={def.id}
+                          brand={brand}
+                          search={search}
+                          isAdmin={isAdmin}
+                          onProductUpdated={onProductUpdated}
+                        />
                       </div>
                     ) : (
-                      <BrandLinePicker categorySlug={def.id} brand={brand} search={search} />
+                      <BrandLinePicker
+                        categorySlug={def.id}
+                        brand={brand}
+                        search={search}
+                        isAdmin={isAdmin}
+                        onProductUpdated={onProductUpdated}
+                      />
                     )
                   )}
                 </div>
@@ -250,7 +269,7 @@ function ComingSoonTile({
   )
 }
 
-export function ShopCategoryAccordion({ onNavigate, search }: ShopCategoryAccordionProps) {
+export function ShopCategoryAccordion({ onNavigate, search, isAdmin = false, onProductUpdated }: ShopCategoryAccordionProps) {
   return (
     <div className="space-y-3 px-3 pb-28 pt-2">
       {SHOP_CATEGORIES.map((cat) => {
@@ -269,10 +288,12 @@ export function ShopCategoryAccordion({ onNavigate, search }: ShopCategoryAccord
             <BrandDrilldownCard
               key={cat.id}
               def={cat}
-              brands={VAPING_BRANDS}
+              brands={cat.id === "e_liquids" ? E_LIQUID_BRANDS : VAPING_BRANDS}
               mode="brand_then_line"
               defaultOpen={cat.id === "vapes"}
               search={search}
+              isAdmin={isAdmin}
+              onProductUpdated={onProductUpdated}
             />
           )
         }
@@ -285,6 +306,8 @@ export function ShopCategoryAccordion({ onNavigate, search }: ShopCategoryAccord
               brands={cat.id === "nicotine_pouches" ? POUCH_BRANDS : undefined}
               mode="brand_only"
               search={search}
+              isAdmin={isAdmin}
+              onProductUpdated={onProductUpdated}
             />
           )
         }

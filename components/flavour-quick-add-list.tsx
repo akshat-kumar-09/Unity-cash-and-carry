@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Check, ShoppingCart, Mail } from "lucide-react"
+import { Check, ShoppingCart, Mail, Pencil, Trash2 } from "lucide-react"
 import {
   matchesBrandFilter,
   getEffectiveMaxQtyPerOrder,
@@ -13,6 +13,7 @@ import { useCart } from "@/lib/cart-context"
 import { triggerCartAddedFeedback } from "@/lib/cart-feedback"
 import { ProductDetailModal } from "@/components/product-detail-modal"
 import { NotifyMeModal } from "@/components/notify-me-modal"
+import { EditProductModal } from "@/components/edit-product-modal"
 
 const FETCH_LIMIT = 100
 const HOLD_DELAY_MS = 420
@@ -20,16 +21,17 @@ const HOLD_INTERVAL_MS = 90
 const INITIAL_VISIBLE = 24
 const VISIBLE_STEP = 24
 
-/** Strips a leading "<line> " prefix from a product name so the row only shows the
- *  flavour part (e.g. "Crystal 4000 Huba Huba" + line "Crystal 4000" → "Huba Huba").
- *  Falls back to the full name when the prefix doesn't match — never hides data. */
+/** Strips a leading "<line>" prefix from a product name so the row only shows the
+ *  flavour part — the important bit that must survive truncation. Handles both naming
+ *  schemes in the catalogue: space-separated ("Crystal 4000 Huba Huba" + line
+ *  "Crystal 4000" → "Huba Huba") and the real site import's dash-separated
+ *  ("PIXL 8000 - Blue Magic" + line "PIXL 8000" → "Blue Magic"). Falls back to the full
+ *  name when the prefix doesn't match — never hides data. */
 function flavourLabel(name: string, line?: string | null): string {
   if (!line) return name
-  const prefix = `${line} `
-  if (name.toLowerCase().startsWith(prefix.toLowerCase())) {
-    return name.slice(prefix.length).trim() || name
-  }
-  return name
+  if (!name.toLowerCase().startsWith(line.toLowerCase())) return name
+  const rest = name.slice(line.length).replace(/^\s*-?\s*/, "")
+  return rest || name
 }
 
 /** Press-and-hold repeat for the stepper buttons: one immediate step on press, then
@@ -72,6 +74,9 @@ function FlavourRow({
   onSetExact,
   onOpenDetail,
   onNotify,
+  isAdmin,
+  onAdminEdit,
+  onAdminDelete,
 }: {
   product: Product
   qty: number
@@ -81,6 +86,9 @@ function FlavourRow({
   onSetExact: (n: number) => void
   onOpenDetail: () => void
   onNotify: () => void
+  isAdmin?: boolean
+  onAdminEdit?: () => void
+  onAdminDelete?: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(String(qty))
@@ -109,7 +117,7 @@ function FlavourRow({
           onError={(e) => { const t = e.currentTarget; if (t.src !== "/placeholder.svg") t.src = "/placeholder.svg"; }}
         />
         <div className="min-w-0">
-          <p className="truncate text-[12px] font-semibold leading-snug text-slate-900">
+          <p className="line-clamp-2 text-[12px] font-semibold leading-snug text-slate-900">
             {flavourLabel(product.name, product.productLine)}
           </p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -127,6 +135,31 @@ function FlavourRow({
           </div>
         </div>
       </button>
+
+      {isAdmin && (
+        <div className="flex shrink-0 items-center gap-1">
+          {onAdminEdit && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onAdminEdit() }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-blue-50"
+              aria-label={`Edit ${product.name}`}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {onAdminDelete && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onAdminDelete() }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-red-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-red-50"
+              aria-label={`Remove ${product.name}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       {outOfStock ? (
         <button
@@ -200,6 +233,8 @@ type FlavourQuickAddListProps = {
    *  (nicotine pouches) where every flavour under the brand is shown directly. */
   productLine?: string | null
   search: string
+  isAdmin?: boolean
+  onProductUpdated?: () => void
 }
 
 /** Rendered inline inside the shop accordion — the innermost expanded level (brand,
@@ -209,6 +244,8 @@ export function FlavourQuickAddList({
   brand,
   productLine = null,
   search,
+  isAdmin = false,
+  onProductUpdated,
 }: FlavourQuickAddListProps) {
   const { addItems } = useCart()
   const [products, setProducts] = useState<Product[]>([])
@@ -217,7 +254,9 @@ export function FlavourQuickAddList({
   const [staged, setStaged] = useState<Record<string, number>>({})
   const [detailProduct, setDetailProduct] = useState<Product | null>(null)
   const [notifyProduct, setNotifyProduct] = useState<Product | null>(null)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [justAdded, setJustAdded] = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
   // Caps how many rows (and images) mount at once — a line with hundreds of flavours
   // shouldn't force the browser to paint/decode all of them the instant it expands.
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
@@ -231,6 +270,7 @@ export function FlavourQuickAddList({
         const params = new URLSearchParams()
         params.set("category", categorySlug)
         params.set("brand", brand)
+        if (productLine) params.set("productLine", productLine)
         params.set("limit", String(FETCH_LIMIT))
         const res = await fetch(`/api/products?${params.toString()}`)
         const data = await res.json()
@@ -248,7 +288,7 @@ export function FlavourQuickAddList({
     }
     load()
     return () => { cancelled = true }
-  }, [categorySlug, brand])
+  }, [categorySlug, brand, productLine, refreshTick])
 
   // Reset staged quantities and the visible-row cap whenever the leaf changes so
   // state from one flavour list never leaks into another after navigating.
@@ -305,6 +345,23 @@ export function FlavourQuickAddList({
     }, 0)
   }, [staged, products])
 
+  const handleAdminDelete = async (product: Product) => {
+    if (!isAdmin) return
+    if (!confirm(`Remove "${product.name}" from the catalog?`)) return
+    try {
+      const res = await fetch(`/api/products/${product.id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || "Could not remove product.")
+        return
+      }
+      setProducts((prev) => prev.filter((p) => p.id !== product.id))
+      onProductUpdated?.()
+    } catch {
+      alert("Could not remove product.")
+    }
+  }
+
   const handleBatchAdd = () => {
     if (totalStaged === 0) return
     const byId = new Map(products.map((p) => [p.id, p]))
@@ -320,7 +377,7 @@ export function FlavourQuickAddList({
   }
 
   return (
-    <div className={totalStaged > 0 ? "pb-16" : ""}>
+    <div className={totalStaged > 0 || justAdded ? "pb-16" : ""}>
       {loading && (
         <div className="px-3 py-8 text-center">
           <div className="inline-flex flex-col items-center gap-2">
@@ -359,6 +416,9 @@ export function FlavourQuickAddList({
                 onSetExact={(n) => setQty(product, () => n)}
                 onOpenDetail={() => setDetailProduct(product)}
                 onNotify={() => setNotifyProduct(product)}
+                isAdmin={isAdmin}
+                onAdminEdit={isAdmin ? () => setEditingProduct(product) : undefined}
+                onAdminDelete={isAdmin ? () => void handleAdminDelete(product) : undefined}
               />
             ))}
           </div>
@@ -374,7 +434,7 @@ export function FlavourQuickAddList({
         </>
       )}
 
-      {totalStaged > 0 && (
+      {(totalStaged > 0 || justAdded) && (
         <div className="pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-[35] flex justify-center px-3">
           <button
             type="button"
@@ -411,6 +471,18 @@ export function FlavourQuickAddList({
           product={notifyProduct}
           isOpen={!!notifyProduct}
           onClose={() => setNotifyProduct(null)}
+        />
+      )}
+      {isAdmin && (
+        <EditProductModal
+          product={editingProduct}
+          isOpen={editingProduct !== null}
+          onClose={() => setEditingProduct(null)}
+          onSuccess={() => {
+            setEditingProduct(null)
+            setRefreshTick((t) => t + 1)
+            onProductUpdated?.()
+          }}
         />
       )}
     </div>

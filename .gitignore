@@ -18,3 +18,5 @@ node_modules/
 
 # Scratch screenshots for debugging with Claude — not part of the app
 screenshots/
+
+.env*

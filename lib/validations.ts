@@ -35,11 +35,13 @@ const productFields = {
   unitsPerPack: z.number().int().positive(),
   unitPrice: z.number().positive(),
   casePrice: z.number().positive(),
-  /** Tier A/B wholesale overrides — omitted/null falls back to unitPrice/casePrice (Tier C). */
+  /** Tier C/B wholesale overrides — omitted/null falls back to unitPrice/casePrice (Tier A). */
   unitPriceA: z.number().positive().optional().nullable(),
   casePriceA: z.number().positive().optional().nullable(),
   unitPriceB: z.number().positive().optional().nullable(),
   casePriceB: z.number().positive().optional().nullable(),
+  /** Suggested resale price per unit, for the cart's margin projection. Omitted/null = hidden. */
+  retailPriceUnit: z.number().positive().optional().nullable(),
   maxQtyPerOrder: z.number().int().min(1).max(99999).default(100),
   badge: z.string().optional(),
   imageUrl: z.string().max(2000).optional().nullable(),
@@ -60,28 +62,42 @@ export const orderItemSchema = z.object({
   quantity: z.number().int().positive(),
 })
 
-export const createOrderSchema = z.object({
-  items: z.array(orderItemSchema).min(1),
-  shippingAddress: z.string().min(1),
-  customerPhone: z.string().min(1),
-  notes: z.string().optional(),
-  promoCode: z.string().optional(),
-  useWalletCredits: z.boolean().optional(),
-})
+export const createOrderSchema = z
+  .object({
+    items: z.array(orderItemSchema).min(1),
+    /** "delivery" (default) requires a shippingAddress; "click_and_collect" collects
+     *  from the Glasgow depot and needs no address. */
+    fulfillmentMethod: z.enum(["delivery", "click_and_collect"]).default("delivery"),
+    shippingAddress: z.string().min(1).optional(),
+    customerPhone: z.string().min(1),
+    notes: z.string().optional(),
+    promoCode: z.string().optional(),
+    useWalletCredits: z.boolean().optional(),
+  })
+  .refine((d) => d.fulfillmentMethod === "click_and_collect" || !!d.shippingAddress?.trim(), {
+    message: "Shipping address is required for delivery orders",
+    path: ["shippingAddress"],
+  })
 
 export const updateOrderStatusSchema = z.object({
   status: z.enum(["pending", "confirmed", "dispatched", "delivered", "cancelled"]),
 })
 
-export const createGuestOrderSchema = z.object({
-  items: z.array(orderItemSchema).min(1),
-  customerName: z.string().min(1),
-  customerEmail: z.string().email(),
-  customerPhone: z.string().min(1),
-  shippingAddress: z.string().min(1),
-  notes: z.string().optional(),
-  tradeCode: z.string().min(1),
-})
+export const createGuestOrderSchema = z
+  .object({
+    items: z.array(orderItemSchema).min(1),
+    customerName: z.string().min(1),
+    customerEmail: z.string().email(),
+    customerPhone: z.string().min(1),
+    fulfillmentMethod: z.enum(["delivery", "click_and_collect"]).default("delivery"),
+    shippingAddress: z.string().min(1).optional(),
+    notes: z.string().optional(),
+    tradeCode: z.string().min(1),
+  })
+  .refine((d) => d.fulfillmentMethod === "click_and_collect" || !!d.shippingAddress?.trim(), {
+    message: "Shipping address is required for delivery orders",
+    path: ["shippingAddress"],
+  })
 
 export const tradeCodeSchema = z.object({
   code: z.string().min(1),
@@ -113,7 +129,7 @@ export const updateProductSchema = z
     productLine: z.string().trim().max(120).optional().nullable(),
     unitPrice: z.number().positive().optional(),
     casePrice: z.number().positive().optional(),
-    /** Tier A/B wholesale overrides — null clears the override back to unitPrice/casePrice. */
+    /** Tier C/B wholesale overrides — null clears the override back to unitPrice/casePrice. */
     unitPriceA: z.number().positive().optional().nullable(),
     casePriceA: z.number().positive().optional().nullable(),
     unitPriceB: z.number().positive().optional().nullable(),
@@ -127,6 +143,14 @@ export const updateProductSchema = z
     liquidVolumeMl: z.number().nonnegative().optional(),
     isSubjectToVapeDuty: z.boolean().optional(),
     nicotineStrengthMg: z.number().nonnegative().optional(),
+    /** "What's Selling" admin curation — any non-null badge features the product on the
+     *  trending shelf (e.g. "Popular", "New"); null unfeatures it. */
+    badge: z.string().trim().max(40).optional().nullable(),
+    /** Manual sort position among featured/promoted products (lower = earlier). Null
+     *  falls back to updatedAt ordering. */
+    trendingOrder: z.number().int().optional().nullable(),
+    /** Suggested resale price per unit, for the cart's margin projection. Null clears it. */
+    retailPriceUnit: z.number().positive().optional().nullable(),
   })
   .refine(
     (d) =>
@@ -144,7 +168,10 @@ export const updateProductSchema = z
       d.maxQtyPerOrder !== undefined ||
       d.liquidVolumeMl !== undefined ||
       d.isSubjectToVapeDuty !== undefined ||
-      d.nicotineStrengthMg !== undefined,
+      d.nicotineStrengthMg !== undefined ||
+      d.badge !== undefined ||
+      d.trendingOrder !== undefined ||
+      d.retailPriceUnit !== undefined,
     { message: "At least one field required" }
   )
 
@@ -187,3 +214,71 @@ export const bulkUpdateProductsSchema = z
       d.nicotineStrengthMg !== undefined,
     { message: "At least one field to update is required" }
   )
+
+// ---- Rewards page admin content (promo codes, banners, depot perks) ----
+
+export const createPromoCodeSchema = z.object({
+  code: z.string().trim().min(2).max(40).transform((s) => s.toUpperCase()),
+  description: z.string().trim().min(1).max(200),
+  discountType: z.enum(["percentage", "fixed_amount"]),
+  value: z.number().positive(),
+  minOrderValue: z.number().nonnegative().optional(),
+})
+
+export const updatePromoCodeSchema = z
+  .object({
+    description: z.string().trim().min(1).max(200).optional(),
+    discountType: z.enum(["percentage", "fixed_amount"]).optional(),
+    value: z.number().positive().optional(),
+    minOrderValue: z.number().nonnegative().optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), { message: "At least one field required" })
+
+export const createPromoBannerSchema = z.object({
+  imageUrl: z.string().trim().min(1).max(2000),
+  altText: z.string().trim().min(1).max(200),
+  sortOrder: z.number().int().optional(),
+})
+
+export const updatePromoBannerSchema = z
+  .object({
+    imageUrl: z.string().trim().min(1).max(2000).optional(),
+    altText: z.string().trim().min(1).max(200).optional(),
+    sortOrder: z.number().int().optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), { message: "At least one field required" })
+
+/** Fixed icon set the frontend can render for a depot perk — keeps admin input constrained
+ *  to icons that actually exist in the UI's icon map. */
+export const DEPOT_PERK_ICONS = ["gift", "truck", "shield", "clock", "percent", "star"] as const
+
+export const createDepotPerkSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(400),
+  icon: z.enum(DEPOT_PERK_ICONS),
+  sortOrder: z.number().int().optional(),
+})
+
+export const updateDepotPerkSchema = z
+  .object({
+    title: z.string().trim().min(1).max(120).optional(),
+    description: z.string().trim().min(1).max(400).optional(),
+    icon: z.enum(DEPOT_PERK_ICONS).optional(),
+    sortOrder: z.number().int().optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), { message: "At least one field required" })
+
+// ---- Admin orders: bulk actions ----
+
+export const bulkOrderStatusSchema = z.object({
+  orderIds: z.array(z.string().min(1)).min(1).max(200),
+  status: z.enum(["pending", "confirmed", "dispatched", "delivered", "cancelled"]),
+})
+
+export const bulkWalletCreditSchema = z.object({
+  amount: z.number().refine((n) => n !== 0, "Amount must be non-zero"),
+  description: z.string().trim().min(1).max(200),
+})
