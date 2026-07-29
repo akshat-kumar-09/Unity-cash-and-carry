@@ -238,11 +238,12 @@ export function CartFooter() {
         return
       }
 
-      // Otherwise there's a balance to pay by card — hand off to Viva's hosted checkout.
-      // Cart is cleared now since the order already exists server-side; if payment is
-      // abandoned the order stays in "Orders" with a Pay Now button to retry.
+      // Otherwise there's a balance to pay by card — hand off to Shopify's checkout
+      // (Viva is enabled as a payment method there). Cart is cleared now since the order
+      // already exists server-side; if payment is abandoned the order stays in "Orders"
+      // with a Pay Now button to retry.
       clearCart()
-      const paymentRes = await fetch("/api/payments/viva/create", {
+      const paymentRes = await fetch("/api/payments/shopify/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: order.id }),

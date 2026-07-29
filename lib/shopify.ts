@@ -88,6 +88,92 @@ async function getAccessToken(): Promise<string> {
   return row.value
 }
 
+export type CreateDraftOrderParams = {
+  /** Used as a tag on the draft order so the resulting paid Order can be matched back — Shopify carries tags over when a draft order is completed. */
+  orderNumber: string
+  customerEmail: string
+  customerName: string
+  lineItems: { title: string; quantity: number; unitPrice: number }[]
+}
+
+/**
+ * Creates a Shopify draft order priced from our own line items (not linked to real
+ * Shopify product/variant IDs — that mapping doesn't exist yet) and returns its
+ * invoiceUrl, which shows Shopify's checkout with Viva as a payment option.
+ */
+export async function createDraftOrderInvoice(
+  params: CreateDraftOrderParams
+): Promise<{ draftOrderId: string; invoiceUrl: string }> {
+  const data = await shopifyGraphQL<{
+    draftOrderCreate: {
+      draftOrder: { id: string; invoiceUrl: string } | null
+      userErrors: { field: string[]; message: string }[]
+    }
+  }>(
+    `mutation CreateDraftOrder($input: DraftOrderInput!) {
+      draftOrderCreate(input: $input) {
+        draftOrder { id invoiceUrl }
+        userErrors { field message }
+      }
+    }`,
+    {
+      input: {
+        email: params.customerEmail || undefined,
+        tags: [`unity-order:${params.orderNumber}`],
+        note: `Unity Cash & Carry order ${params.orderNumber}`,
+        lineItems: params.lineItems.map((item) => ({
+          title: item.title,
+          quantity: item.quantity,
+          originalUnitPrice: item.unitPrice.toFixed(2),
+        })),
+      },
+    }
+  )
+
+  const result = data.draftOrderCreate
+  if (result.userErrors.length > 0) {
+    throw new Error(`Shopify draft order create failed: ${JSON.stringify(result.userErrors)}`)
+  }
+  if (!result.draftOrder) {
+    throw new Error("Shopify draft order create returned no draftOrder")
+  }
+  return { draftOrderId: result.draftOrder.id, invoiceUrl: result.draftOrder.invoiceUrl }
+}
+
+/** Verifies the X-Shopify-Hmac-Sha256 header Shopify signs onto every webhook delivery. */
+export function verifyWebhookHmac(rawBody: string, hmacHeader: string | null): boolean {
+  if (!hmacHeader) return false
+  const digest = crypto.createHmac("sha256", CLIENT_SECRET).update(rawBody, "utf8").digest("base64")
+  const digestBuf = Buffer.from(digest)
+  const hmacBuf = Buffer.from(hmacHeader)
+  return digestBuf.length === hmacBuf.length && crypto.timingSafeEqual(digestBuf, hmacBuf)
+}
+
+/** One-time setup: registers the orders/paid webhook so paid draft orders mark our Order paid. */
+export async function registerOrdersPaidWebhook(callbackUrl: string): Promise<void> {
+  const data = await shopifyGraphQL<{
+    webhookSubscriptionCreate: {
+      webhookSubscription: { id: string } | null
+      userErrors: { field: string[]; message: string }[]
+    }
+  }>(
+    `mutation RegisterWebhook($callbackUrl: URL!) {
+      webhookSubscriptionCreate(
+        topic: ORDERS_PAID
+        webhookSubscription: { callbackUrl: $callbackUrl, format: JSON }
+      ) {
+        webhookSubscription { id }
+        userErrors { field message }
+      }
+    }`,
+    { callbackUrl }
+  )
+  const result = data.webhookSubscriptionCreate
+  if (result.userErrors.length > 0) {
+    throw new Error(`Shopify webhook registration failed: ${JSON.stringify(result.userErrors)}`)
+  }
+}
+
 export async function shopifyGraphQL<T = unknown>(
   query: string,
   variables?: Record<string, unknown>

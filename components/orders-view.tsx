@@ -173,7 +173,7 @@ export function OrdersView() {
   const handlePayNow = async (order: Order) => {
     setPayingOrderId(order.id)
     try {
-      const res = await fetch("/api/payments/viva/create", {
+      const res = await fetch("/api/payments/shopify/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: order.id }),

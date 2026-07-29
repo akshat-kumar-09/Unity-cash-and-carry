@@ -121,8 +121,9 @@ model Order {
   vatOnDuty          Float @default(0.00)
   // Viva Wallet (Smart Checkout) payment tracking
   paymentStatus      String    @default("unpaid") // unpaid, paid, failed
-  paymentMethod      String?   // "card" (Viva) | "wallet" (fully covered by wallet credits)
+  paymentMethod      String?   // "card" (Viva via Shopify checkout) | "wallet" (fully covered by wallet credits)
   vivaOrderCode      String?   @unique
+  shopifyDraftOrderId String?  @unique
   paidAt             DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
