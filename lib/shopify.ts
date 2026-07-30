@@ -21,7 +21,7 @@ const API_VERSION = "2026-07"
 const ACCESS_TOKEN_KEY = "shopify_access_token"
 
 export const SHOPIFY_SCOPES =
-  "read_products,write_products,read_orders,write_orders,read_inventory,write_inventory"
+  "read_products,write_products,read_orders,write_orders,read_inventory,write_inventory,read_locations"
 
 export function getAuthorizeUrl(redirectUri: string, state: string): string {
   const url = new URL(`https://${SHOP}/admin/oauth/authorize`)
