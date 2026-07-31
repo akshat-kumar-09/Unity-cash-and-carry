@@ -76,6 +76,9 @@ model Product {
   /// cart's margin projection only shows for products where this is actually set.
   retailPriceUnit Float?
   imageUrl      String?
+  shopifyProductId       String? @unique
+  shopifyVariantId       String? @unique
+  shopifyInventoryItemId String? @unique
   isActive      Boolean   @default(true)
   /// Whether this product should appear in shop browse/search results. Distinct from
   /// isActive, which also gates cart/order validity — a hidden gift item (e.g. the

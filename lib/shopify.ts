@@ -88,6 +88,109 @@ async function getAccessToken(): Promise<string> {
   return row.value
 }
 
+export type CreateShopifyProductParams = {
+  title: string
+  vendor: string
+  sku: string
+  price: number
+  imageUrl?: string | null
+  description?: string
+}
+
+/**
+ * Creates a real Shopify product (status ACTIVE) with a single default variant carrying
+ * our SKU/price. Deliberately doesn't set an initial inventory quantity — new variants
+ * default to 0 stock at existing locations, which matches the "staff fills in real counts
+ * in Shopify" rollout plan, and avoids needing the read_locations scope for this step.
+ */
+export async function createShopifyProduct(
+  params: CreateShopifyProductParams
+): Promise<{ productId: string; variantId: string; inventoryItemId: string }> {
+  const productData = await shopifyGraphQL<{
+    productCreate: {
+      product: { id: string; variants: { nodes: { id: string }[] } } | null
+      userErrors: { field: string[]; message: string }[]
+    }
+  }>(
+    `mutation CreateProduct($input: ProductInput!) {
+      productCreate(input: $input) {
+        product { id variants(first: 1) { nodes { id } } }
+        userErrors { field message }
+      }
+    }`,
+    {
+      input: {
+        title: params.title,
+        vendor: params.vendor,
+        status: "ACTIVE",
+        descriptionHtml: params.description || undefined,
+      },
+    }
+  )
+
+  if (productData.productCreate.userErrors.length > 0) {
+    throw new Error(`Shopify product create failed: ${JSON.stringify(productData.productCreate.userErrors)}`)
+  }
+  const productId = productData.productCreate.product?.id
+  const defaultVariantId = productData.productCreate.product?.variants.nodes[0]?.id
+  if (!productId || !defaultVariantId) throw new Error("Shopify product create returned no product/variant")
+
+  const variantData = await shopifyGraphQL<{
+    productVariantsBulkUpdate: {
+      productVariants: { id: string; inventoryItem: { id: string } }[]
+      userErrors: { field: string[]; message: string }[]
+    }
+  }>(
+    `mutation UpdateDefaultVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        productVariants { id inventoryItem { id } }
+        userErrors { field message }
+      }
+    }`,
+    {
+      productId,
+      variants: [{
+        id: defaultVariantId,
+        price: params.price.toFixed(2),
+        inventoryItem: { sku: params.sku, tracked: true },
+      }],
+    }
+  )
+
+  if (variantData.productVariantsBulkUpdate.userErrors.length > 0) {
+    throw new Error(
+      `Shopify variant update failed: ${JSON.stringify(variantData.productVariantsBulkUpdate.userErrors)}`
+    )
+  }
+  const variant = variantData.productVariantsBulkUpdate.productVariants[0]
+  if (!variant) throw new Error("Shopify variant update returned no variant")
+
+  // Best-effort: media import is async on Shopify's side and can fail per-URL (blocked
+  // host, bad format) without that being this function's problem to solve — log and move
+  // on rather than failing the whole product over an image.
+  if (params.imageUrl) {
+    try {
+      const mediaData = await shopifyGraphQL<{
+        productCreateMedia: { userErrors: { field: string[]; message: string }[] }
+      }>(
+        `mutation CreateMedia($productId: ID!, $media: [CreateMediaInput!]!) {
+          productCreateMedia(productId: $productId, media: $media) {
+            userErrors { field message }
+          }
+        }`,
+        { productId, media: [{ originalSource: params.imageUrl, mediaContentType: "IMAGE" }] }
+      )
+      if (mediaData.productCreateMedia.userErrors.length > 0) {
+        console.warn(`Shopify media attach warning for ${productId}:`, mediaData.productCreateMedia.userErrors)
+      }
+    } catch (e) {
+      console.warn(`Shopify media attach failed for ${productId}:`, e)
+    }
+  }
+
+  return { productId, variantId: variant.id, inventoryItemId: variant.inventoryItem.id }
+}
+
 export type CreateDraftOrderParams = {
   /** Used as a tag on the draft order so the resulting paid Order can be matched back — Shopify carries tags over when a draft order is completed. */
   orderNumber: string
@@ -149,24 +252,24 @@ export function verifyWebhookHmac(rawBody: string, hmacHeader: string | null): b
   return digestBuf.length === hmacBuf.length && crypto.timingSafeEqual(digestBuf, hmacBuf)
 }
 
-/** One-time setup: registers the orders/paid webhook so paid draft orders mark our Order paid. */
-export async function registerOrdersPaidWebhook(callbackUrl: string): Promise<void> {
+/** One-time setup: registers a webhook subscription for the given topic. */
+export async function registerWebhook(topic: string, callbackUrl: string): Promise<void> {
   const data = await shopifyGraphQL<{
     webhookSubscriptionCreate: {
       webhookSubscription: { id: string } | null
       userErrors: { field: string[]; message: string }[]
     }
   }>(
-    `mutation RegisterWebhook($callbackUrl: URL!) {
+    `mutation RegisterWebhook($topic: WebhookSubscriptionTopic!, $callbackUrl: URL!) {
       webhookSubscriptionCreate(
-        topic: ORDERS_PAID
+        topic: $topic
         webhookSubscription: { callbackUrl: $callbackUrl, format: JSON }
       ) {
         webhookSubscription { id }
         userErrors { field message }
       }
     }`,
-    { callbackUrl }
+    { topic, callbackUrl }
   )
   const result = data.webhookSubscriptionCreate
   if (result.userErrors.length > 0) {
