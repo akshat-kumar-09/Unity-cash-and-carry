@@ -34,7 +34,11 @@ export async function POST(request: NextRequest) {
 
     const newPrice = Number(variant.price)
     if (Number.isFinite(newPrice) && newPrice !== product.unitPrice) {
-      await prisma.product.update({ where: { id: product.id }, data: { unitPrice: newPrice } })
+      const newCasePrice = Math.round(newPrice * product.unitsPerPack * 100) / 100
+      await prisma.product.update({
+        where: { id: product.id },
+        data: { unitPrice: newPrice, casePrice: newCasePrice },
+      })
     }
 
     return NextResponse.json({ ok: true })
