@@ -54,7 +54,7 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
             className={`relative flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-600/25 transition hover:bg-blue-700 active:scale-[0.98] unity-tap ${
               cartPulsing ? "animate-cart-pulse" : ""
             }`}
-            aria-label={`View cart (${totalItems} items)`}
+            aria-label={`View cart (${totalItems} ${totalItems === 1 ? "item" : "items"})`}
           >
             <ShoppingCart className="h-5 w-5" strokeWidth={2.25} />
             {totalItems > 0 && (

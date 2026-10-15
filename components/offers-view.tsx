@@ -829,7 +829,9 @@ export function OffersView() {
           </section>
         )}
 
-        {/* Depot Perks — admin-managed (Admin → Rewards → Depot Perks) */}
+        {/* Depot Perks — admin-managed (Admin → Rewards → Depot Perks). Retailers don't
+            see an empty section; admin does, so there's somewhere to add the first one. */}
+        {(isAdmin || perksLoading || perks.length > 0) && (
         <section className="space-y-3">
           <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 text-left">
             Depot Wholesale Perks
@@ -919,6 +921,7 @@ export function OffersView() {
             )
           )}
         </section>
+        )}
 
         <p className="text-center text-[10px] text-slate-400 py-3">
           Unity Cash &amp; Carry · Trade wholesale · Glasgow

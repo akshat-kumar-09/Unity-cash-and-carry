@@ -110,22 +110,22 @@ function LineCard({ group, onSaved }: { group: LineGroup; onSaved: () => void })
             />
           </div>
           <div>
-            <label className="mb-1 block text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Tier C</label>
-            <input
-              type="text"
-              inputMode="decimal"
-              value={aStr}
-              onChange={(e) => setAStr(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-2 py-2 text-center font-mono text-[13px]"
-            />
-          </div>
-          <div>
             <label className="mb-1 block text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Tier B</label>
             <input
               type="text"
               inputMode="decimal"
               value={bStr}
               onChange={(e) => setBStr(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-2 py-2 text-center font-mono text-[13px]"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Tier C</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={aStr}
+              onChange={(e) => setAStr(e.target.value)}
               className="w-full rounded-lg border border-slate-200 px-2 py-2 text-center font-mono text-[13px]"
             />
           </div>

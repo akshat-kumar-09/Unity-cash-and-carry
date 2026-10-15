@@ -520,7 +520,7 @@ export function AdminOrdersView() {
                       <button
                         type="button"
                         onClick={() => setExpandedId(isExpanded ? null : order.id)}
-                        className="flex flex-1 items-center gap-3 py-1.5 text-left focus:outline-none"
+                        className="flex min-w-0 flex-1 items-center gap-3 py-1.5 text-left focus:outline-none"
                       >
                         <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-150 bg-gradient-to-br from-slate-50 to-slate-100">
                           {order.items?.[0]?.product ? (
@@ -552,20 +552,26 @@ export function AdminOrdersView() {
                           </div>
                           <p className="text-[10.5px] font-semibold text-slate-500 truncate">{orderBrief(order)}</p>
                           <p className="font-mono text-[10px] font-semibold text-slate-400 truncate">
-                            #{order.orderNumber} · {formatDate(order.createdAt)}
+                            {formatDate(order.createdAt)} · #{order.orderNumber}
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                              <StatusPill status={order.status} />
                               {order.fulfillmentMethod === "click_and_collect" && (
                                 <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[9.5px] font-black uppercase tracking-wider text-blue-700">
                                   <Package className="h-3 w-3" /> Collect
                                 </span>
                               )}
-                              {isAwaitingPayment(order) && (
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider text-red-600">
-                                  Unpaid
-                                </span>
-                              )}
-                              <StatusPill status={order.status} />
+                              {isAwaitingPayment(order) &&
+                                (isAwaitingCollection(order) ? (
+                                  // Taken at the counter on collection — not something to chase yet.
+                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider text-slate-600">
+                                    Pay at counter
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider text-red-600">
+                                    Unpaid
+                                  </span>
+                                ))}
                           </div>
                         </div>
 
@@ -650,12 +656,12 @@ export function AdminOrdersView() {
                               )}
                             </div>
                             {!order.collectedAt && (
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="mt-3 grid grid-cols-2 gap-2">
                                 <button
                                   type="button"
                                   disabled={updatingId === order.id}
                                   onClick={() => handleMarkReady(order)}
-                                  className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold uppercase tracking-wide transition disabled:opacity-40 ${
+                                  className={`unity-tap col-span-2 flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide transition disabled:opacity-40 ${
                                     order.readyAt
                                       ? "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"
                                       : "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
@@ -665,21 +671,24 @@ export function AdminOrdersView() {
                                 </button>
                                 {order.total > 0 && !isPaid ? (
                                   <>
+                                    <p className="col-span-2 mt-1 text-[9.5px] font-black uppercase tracking-widest text-slate-400">
+                                      Collected — £{order.total.toFixed(2)} paid by
+                                    </p>
                                     <button
                                       type="button"
                                       disabled={updatingId === order.id}
                                       onClick={() => handleCollected(order, "cash")}
-                                      className="flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                                      className="unity-tap flex items-center justify-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-40"
                                     >
-                                      <Banknote className="h-3.5 w-3.5" /> Collected · cash
+                                      <Banknote className="h-3.5 w-3.5" /> Cash
                                     </button>
                                     <button
                                       type="button"
                                       disabled={updatingId === order.id}
                                       onClick={() => handleCollected(order, "card")}
-                                      className="flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                                      className="unity-tap flex items-center justify-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-40"
                                     >
-                                      <CreditCard className="h-3.5 w-3.5" /> Collected · card
+                                      <CreditCard className="h-3.5 w-3.5" /> Card
                                     </button>
                                   </>
                                 ) : (
@@ -687,7 +696,7 @@ export function AdminOrdersView() {
                                     type="button"
                                     disabled={updatingId === order.id}
                                     onClick={() => handleCollected(order)}
-                                    className="flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                                    className="unity-tap col-span-2 flex items-center justify-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-40"
                                   >
                                     <CheckCircle2 className="h-3.5 w-3.5" /> Collected
                                   </button>

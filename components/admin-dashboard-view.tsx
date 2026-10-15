@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   LayoutDashboard,
   Warehouse,
@@ -69,25 +69,30 @@ export function AdminDashboardView({ activeSection, onSectionChange, children }:
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true)
-        const res = await fetch("/api/admin/reports?type=dashboard_stats")
-        if (!res.ok) throw new Error("Failed to load dashboard stats")
-        const data = await res.json()
-        setStats(data)
-      } catch (e) {
-        // Never show stand-in figures here — an owner reading made-up revenue as real is
-        // worse than an honest "couldn't load".
-        setError(e instanceof Error ? e.message : "Something went wrong")
-        setStats(null)
-      } finally {
-        setLoading(false)
-      }
+  const fetchStats = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const res = await fetch("/api/admin/reports?type=dashboard_stats")
+      if (!res.ok) throw new Error("Failed to load dashboard stats")
+      const data = await res.json()
+      setStats(data)
+    } catch (e) {
+      // Never show stand-in figures here — an owner reading made-up revenue as real is
+      // worse than an honest "couldn't load".
+      setError(e instanceof Error ? e.message : "Something went wrong")
+      setStats(null)
+    } finally {
+      setLoading(false)
     }
-    fetchStats()
   }, [])
+
+  // Only the dashboard shows these figures — load them when it's on screen (and fresh
+  // each time it's returned to), not behind every other section.
+  const showingDashboard = activeSection === "dashboard"
+  useEffect(() => {
+    if (showingDashboard) fetchStats()
+  }, [showingDashboard, fetchStats])
 
   const kpiCards = stats
     ? [
@@ -164,22 +169,29 @@ export function AdminDashboardView({ activeSection, onSectionChange, children }:
 
   return (
     <div className="flex min-h-[100dvh] flex-col unity-app-screen pb-28">
+      {/* Header and section tabs stick together as one block, so the tabs never slide
+          under the header whatever its height. */}
+      <div className="sticky top-0 z-20">
       <AppScreenHeader
         title="Admin Command Centre"
         subtitle="Unity Cash & Carry — Operational Dashboard"
       />
 
       {/* Sub-Navigation Bar */}
-      <nav className="sticky top-[60px] z-10 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
-        <div className="flex overflow-x-auto px-2 py-1.5 gap-0.5 no-scrollbar">
+      <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
+        <div className="flex overflow-x-auto px-2 py-1.5 gap-0.5 scrollbar-hide">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon
             const isActive = activeSection === item.key
             return (
               <button
                 key={item.key}
-                onClick={() => onSectionChange(item.key)}
-                className={`flex items-center gap-1.5 whitespace-nowrap px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${
+                onClick={(e) => {
+                  onSectionChange(item.key)
+                  // Sections further right start off-screen — bring the chosen one into view.
+                  e.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
+                }}
+                className={`unity-tap flex items-center gap-1.5 whitespace-nowrap px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${
                   isActive
                     ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
                     : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
@@ -192,30 +204,32 @@ export function AdminDashboardView({ activeSection, onSectionChange, children }:
           })}
         </div>
       </nav>
+      </div>
 
-      {/* Dashboard Content */}
-      {children ? (
-        children
+      {/* Dashboard Content. A section's own title bar scrolls with it — the block above
+          already stays pinned. */}
+      {activeSection !== "dashboard" ? (
+        <div className="[&_header]:static">{children}</div>
       ) : (
         <main className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
-          {/* Loading State */}
-          {loading && (
+          {/* Loading State — first load only; a refresh keeps the last figures on screen */}
+          {loading && !stats && (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
             </div>
           )}
 
-        {!loading && (
+        {!(loading && !stats) && (
           <>
             {/* Error Banner (soft — still show data) */}
             {error && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-[12px] font-medium text-amber-800 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span className="flex-1">Couldn&apos;t load today&apos;s figures. Pull to refresh or try again shortly.</span>
+                <span className="flex-1">Couldn&apos;t load today&apos;s figures. Try again in a moment.</span>
                 <button
                   type="button"
-                  onClick={() => window.location.reload()}
-                  className="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-900"
+                  onClick={fetchStats}
+                  className="unity-tap shrink-0 rounded-lg bg-amber-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-900"
                 >
                   Retry
                 </button>

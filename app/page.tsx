@@ -39,49 +39,31 @@ type OnboardingProfile = {
 export type AdminSection = "dashboard" | "warehouse" | "leads" | "routes" | "compliance" | "pricing" | "reports" | "settings"
 
 function AdminView() {
-  const [section, setSection] = useState<AdminSection>("dashboard")
+  const [section, setSectionState] = useState<AdminSection>("dashboard")
+  const sectionChanged = useRef(false)
+  const setSection = (next: AdminSection) => {
+    sectionChanged.current = true
+    setSectionState(next)
+  }
+  // Each section opens at its top rather than wherever the last one was scrolled to.
+  useLayoutEffect(() => {
+    if (!sectionChanged.current) return
+    sectionChanged.current = false
+    window.scrollTo(0, 0)
+  }, [section])
 
+  // One frame for every section, so the header and section tabs stay put (tab strip
+  // scroll included) and only the content below them changes.
   return (
-    <>
-      {section === "dashboard" && (
-        <AdminDashboardView activeSection={section} onSectionChange={setSection} />
-      )}
-      {section === "warehouse" && (
-        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
-          <AdminWarehouseView />
-        </AdminDashboardView>
-      )}
-      {section === "leads" && (
-        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
-          <AdminLeadsView />
-        </AdminDashboardView>
-      )}
-      {section === "routes" && (
-        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
-          <AdminRoutePlannerView />
-        </AdminDashboardView>
-      )}
-      {section === "compliance" && (
-        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
-          <AdminComplianceView />
-        </AdminDashboardView>
-      )}
-      {section === "pricing" && (
-        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
-          <AdminPricingView />
-        </AdminDashboardView>
-      )}
-      {section === "reports" && (
-        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
-          <AdminReportsView />
-        </AdminDashboardView>
-      )}
-      {section === "settings" && (
-        <AdminDashboardView activeSection={section} onSectionChange={setSection}>
-          <AdminSettingsView />
-        </AdminDashboardView>
-      )}
-    </>
+    <AdminDashboardView activeSection={section} onSectionChange={setSection}>
+      {section === "warehouse" && <AdminWarehouseView />}
+      {section === "leads" && <AdminLeadsView />}
+      {section === "routes" && <AdminRoutePlannerView />}
+      {section === "compliance" && <AdminComplianceView />}
+      {section === "pricing" && <AdminPricingView />}
+      {section === "reports" && <AdminReportsView />}
+      {section === "settings" && <AdminSettingsView />}
+    </AdminDashboardView>
   )
 }
 

@@ -69,7 +69,7 @@ export function StoreHeader({ isAdmin = false, morphed = false }: { isAdmin?: bo
             type="button"
             onClick={openCart}
             className="relative flex items-center gap-2 p-1 -m-1 rounded-lg hover:bg-white/10 transition-colors"
-            aria-label={`View cart (${totalItems} items)`}
+            aria-label={`View cart (${totalItems} ${totalItems === 1 ? "item" : "items"})`}
           >
             <ShoppingCart className={`text-white transition-all duration-300 ${morphed ? "w-4 h-4" : "w-5 h-5"}`} />
             {totalItems > 0 && (

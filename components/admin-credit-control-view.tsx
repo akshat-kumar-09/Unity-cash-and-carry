@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { Wallet, Loader2, Search, Plus, Minus, RefreshCw, FileText, ShieldCheck, ChevronLeft, Printer, Download, Building } from "lucide-react"
 import { AppScreenHeader } from "@/components/app-screen-header"
+import { useOnTabShown } from "@/lib/tab-events"
 import { toast } from "sonner"
 import { UNITY_BUSINESS, VPD_EFFECTIVE_DATE } from "@/lib/unity-business"
 
@@ -18,6 +19,7 @@ type Retailer = {
 type InspectorOrder = {
   id: string
   orderNumber: string
+  status: string
   createdAt: string
   vapeDutyAmount: number
   customerName: string | null
@@ -51,7 +53,8 @@ export function AdminCreditControlView() {
       const res = await fetch("/api/orders")
       if (!res.ok) throw new Error("Failed to load orders")
       const data = await res.json()
-      setInspectorOrders(Array.isArray(data) ? data : [])
+      // Cancelled orders never shipped, so they have no place in a duty ledger.
+      setInspectorOrders(Array.isArray(data) ? data.filter((o: InspectorOrder) => o.status !== "cancelled") : [])
     } catch {
       setInspectorOrders([])
     } finally {
@@ -114,6 +117,11 @@ export function AdminCreditControlView() {
   useEffect(() => {
     fetchRetailers()
   }, [])
+  // Kept mounted between visits — refresh balances and the ledger quietly on return.
+  useOnTabShown("assist", () => {
+    fetchRetailers()
+    fetchInspectorOrders()
+  })
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -226,7 +234,7 @@ export function AdminCreditControlView() {
           </button>
         </div>
 
-        {loading && (
+        {loading && retailers.length === 0 && (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-9 w-9 animate-spin text-blue-600" />
           </div>
@@ -238,7 +246,7 @@ export function AdminCreditControlView() {
           </div>
         )}
 
-        {!loading && !error && filtered.length === 0 && (
+        {!(loading && retailers.length === 0) && !error && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white py-16 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
               <Wallet className="h-7 w-7 text-slate-400" />
@@ -247,7 +255,7 @@ export function AdminCreditControlView() {
           </div>
         )}
 
-        {!loading && !error && filtered.length > 0 && (
+        {!(loading && retailers.length === 0) && !error && filtered.length > 0 && (
           <ul className="space-y-3">
             {filtered.map((r) => {
               const open = adjustingId === r.id
@@ -361,7 +369,7 @@ export function AdminCreditControlView() {
             <div className="flex h-28 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-blue-300" /></div>
           ) : (
             <>
-              <div className="grid grid-cols-3 gap-3 text-left">
+              <div className="grid grid-cols-2 gap-3 text-left sm:grid-cols-3">
                 <div className="p-4 rounded-2xl border border-slate-200/90 bg-white">
                   <p className="text-2xl font-black text-slate-900 leading-none">{inspectorStats.totalOrders}</p>
                   <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-1.5 block">Total Orders</p>
@@ -370,8 +378,8 @@ export function AdminCreditControlView() {
                   <p className="text-2xl font-black text-slate-900 leading-none">{(inspectorStats.totalVolumeMl / 1000).toFixed(2)}L</p>
                   <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-1.5 block">Liquid Volume</p>
                 </div>
-                <div className={`p-4 rounded-2xl border border-l-4 ${vpdIsLive ? "border-slate-200/90 border-l-emerald-500 bg-emerald-50" : "border-slate-200/90 border-l-slate-300 bg-slate-50"}`}>
-                  <p className={`text-2xl font-black leading-none ${vpdIsLive ? "text-emerald-700" : "text-slate-500"}`}>£{inspectorStats.totalDutyPaid.toFixed(2)}</p>
+                <div className={`col-span-2 sm:col-span-1 p-4 rounded-2xl border border-l-4 ${vpdIsLive ? "border-slate-200/90 border-l-emerald-500 bg-emerald-50" : "border-slate-200/90 border-l-slate-300 bg-slate-50"}`}>
+                  <p className={`text-2xl font-black leading-none ${vpdIsLive ? "text-emerald-700" : "text-slate-500"}`}>£{inspectorStats.totalDutyPaid.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-1.5 block">
                     VPD Collected {!vpdIsLive && "(from Oct '26)"}
                   </p>
@@ -391,9 +399,10 @@ export function AdminCreditControlView() {
                   ) : (
                     inspectorOrders.map((o) => (
                       <div key={o.id} className="grid grid-cols-4 gap-2 px-4 py-3.5 items-center">
-                        <span className="font-mono font-bold text-slate-800">{o.orderNumber.split("-")[1] || o.orderNumber}</span>
-                        <span className="text-slate-500 truncate">{o.customerName || o.user?.name || o.user?.email || "Unknown"}</span>
-                        <span className="text-right text-slate-500">{formatOrderDate(o.createdAt)}</span>
+                        {/* The short suffix is what tells orders apart; the full number is on the order. */}
+                        <span className="min-w-0 truncate font-mono font-bold text-slate-800">{o.orderNumber.split("-").pop() || o.orderNumber}</span>
+                        <span className="min-w-0 truncate text-slate-500">{o.customerName || o.user?.name || o.user?.email || "Unknown"}</span>
+                        <span className="min-w-0 truncate text-right text-slate-500">{formatOrderDate(o.createdAt)}</span>
                         <span className="text-right font-mono font-bold text-slate-700">£{o.vapeDutyAmount.toFixed(2)}</span>
                       </div>
                     ))

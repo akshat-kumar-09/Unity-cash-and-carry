@@ -20,17 +20,23 @@ const HOLD_INTERVAL_MS = 90
 const INITIAL_VISIBLE = 24
 const VISIBLE_STEP = 24
 
-/** Strips a leading "<line>" prefix from a product name so the row only shows the
- *  flavour part — the important bit that must survive truncation. Handles both naming
- *  schemes in the catalogue: space-separated ("Crystal 4000 Huba Huba" + line
- *  "Crystal 4000" → "Huba Huba") and the real site import's dash-separated
- *  ("PIXL 8000 - Blue Magic" + line "PIXL 8000" → "Blue Magic"). Falls back to the full
- *  name when the prefix doesn't match — never hides data. */
-function flavourLabel(name: string, line?: string | null): string {
+/** Strips a leading "<line>" (or "<brand> <line>") prefix from a product name so the row
+ *  only shows the flavour part — the important bit that must survive truncation. Spaces
+ *  and dashes between words are treated alike, which covers every naming scheme in the
+ *  catalogue: "Crystal 4000 Huba Huba" + line "Crystal 4000" → "Huba Huba", "PIXL 8000 -
+ *  Blue Magic" + "PIXL 8000" → "Blue Magic", and "Elf Bar 600 - Kit Banana Ice" + brand
+ *  "Elf Bar", line "600 Kit" → "Banana Ice". Falls back to the full name when no prefix
+ *  matches — never hides data. */
+function flavourLabel(name: string, line?: string | null, brand?: string | null): string {
   if (!line) return name
-  if (!name.toLowerCase().startsWith(line.toLowerCase())) return name
-  const rest = name.slice(line.length).replace(/^\s*-?\s*/, "")
-  return rest || name
+  const escape = (word: string) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  for (const prefix of brand ? [`${brand} ${line}`, line] : [line]) {
+    const words = prefix.split(/[\s-]+/).filter(Boolean).map(escape)
+    if (words.length === 0) continue
+    const match = name.match(new RegExp(`^${words.join("[\\s-]+")}[\\s-]+`, "i"))
+    if (match && match[0].length < name.length) return name.slice(match[0].length)
+  }
+  return name
 }
 
 /** Press-and-hold repeat for the stepper buttons: one immediate step on press, then
@@ -117,7 +123,7 @@ function FlavourRow({
         />
         <div className="min-w-0">
           <p className="line-clamp-2 text-[12px] font-semibold leading-snug text-slate-900">
-            {flavourLabel(product.name, product.productLine)}
+            {flavourLabel(product.name, product.productLine, product.brand)}
           </p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             {outOfStock && (

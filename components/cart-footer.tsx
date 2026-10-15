@@ -525,7 +525,7 @@ export function CartFooter({ showBar = true }: { showBar?: boolean }) {
                     value={formData.notes}
                     onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
                     className="w-full px-3 py-2.5 border border-slate-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px]"
-                    placeholder="Delivery instructions, etc."
+                    placeholder={formData.fulfillmentMethod === "delivery" ? "Delivery instructions, etc." : "e.g. collecting around 3pm"}
                   />
                 </div>
                 <div>
@@ -630,7 +630,7 @@ export function CartFooter({ showBar = true }: { showBar?: boolean }) {
                             <p className="text-[10px] text-blue-700 font-bold font-mono uppercase">
                               {item.product.brand}
                             </p>
-                            <p className="text-sm font-bold text-slate-800 truncate">
+                            <p className="line-clamp-2 break-words text-sm font-bold leading-snug text-slate-800">
                               {item.product.name}
                             </p>
                             <p className="text-[10px] text-slate-500 font-mono">

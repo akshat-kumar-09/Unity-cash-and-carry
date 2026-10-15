@@ -2,10 +2,12 @@
 
 import { useSession, signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
-import { LogOut, Shield, Building2, FileText, MapPin, CheckCircle2, Clock, XCircle, KeyRound, ChevronDown } from "lucide-react"
+import { LogOut, Shield, Building2, FileText, MapPin, CheckCircle2, Clock, XCircle, KeyRound, ChevronDown, Bookmark } from "lucide-react"
+import { paymentMethodLabel } from "@/lib/payment"
 import { UnityLogo } from "@/components/unity-logo"
 import { AppScreenHeader } from "@/components/app-screen-header"
 import { TradeIdCard } from "@/components/trade-id-card"
+import { useOnTabShown } from "@/lib/tab-events"
 import { toast } from "sonner"
 
 type ComplianceData = {
@@ -35,6 +37,12 @@ export function AccountView() {
   const [pwSaving, setPwSaving] = useState(false)
   const [pwError, setPwError] = useState("")
   const [complianceOpen, setComplianceOpen] = useState(false)
+  const [savedCheckout, setSavedCheckout] = useState<{
+    phone: string | null
+    address: string | null
+    fulfillmentMethod: string | null
+    paymentMethod: string | null
+  } | null>(null)
   const [passwordOpen, setPasswordOpen] = useState(false)
 
   useEffect(() => {
@@ -62,6 +70,28 @@ export function AccountView() {
     console.log(`User response to the install prompt: ${outcome}`)
     setDeferredPrompt(null)
     setShowInstallBtn(false)
+  }
+
+  // The tab stays mounted, so refresh on every visit — details saved at a checkout
+  // a minute ago should be here without a reload.
+  const loadSavedCheckout = () => {
+    fetch("/api/account/checkout-details")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setSavedCheckout)
+      .catch(() => {})
+  }
+  useEffect(loadSavedCheckout, [])
+  useOnTabShown("account", loadSavedCheckout)
+
+  const forgetCheckoutDetails = async () => {
+    try {
+      const res = await fetch("/api/account/checkout-details", { method: "DELETE" })
+      if (!res.ok) throw new Error()
+      setSavedCheckout(null)
+      toast.success("Saved checkout details forgotten")
+    } catch {
+      toast.error("Couldn't forget your details — try again")
+    }
   }
 
   useEffect(() => {
@@ -150,8 +180,10 @@ export function AccountView() {
   }
 
   const isAdminUser = (session?.user as any)?.role === "admin"
-  const cs = isAdminUser ? "admin" : compliance?.complianceStatus || "pending"
-  const statusInfo = statusConfig[cs] || statusConfig.pending
+  // Unknown until the profile arrives — show a placeholder rather than flashing
+  // "Pending Verification" at an approved retailer.
+  const cs = isAdminUser ? "admin" : compliance?.complianceStatus ?? null
+  const statusInfo = (cs && statusConfig[cs]) || statusConfig.pending
   const StatusIcon = statusInfo.icon
 
   return (
@@ -180,6 +212,9 @@ export function AccountView() {
         )}
 
         {/* Compliance Status Banner */}
+        {cs === null ? (
+          <div className="h-[52px] rounded-2xl border border-slate-200 bg-white" aria-busy="true" aria-label="Loading account status" />
+        ) : (
         <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 ${statusInfo.bg}`}>
           <StatusIcon className={`h-5 w-5 shrink-0 ${statusInfo.color}`} />
           <div>
@@ -196,6 +231,7 @@ export function AccountView() {
             )}
           </div>
         </div>
+        )}
 
         {/* Business Compliance Form — doesn't apply to the platform admin account */}
         {!isAdminUser && (
@@ -374,6 +410,33 @@ export function AccountView() {
             >
               Install Mobile App
             </button>
+          </div>
+        )}
+
+        {/* Details remembered at checkout — visible here so they can be cleared */}
+        {!isAdminUser && savedCheckout && (savedCheckout.phone || savedCheckout.address) && (
+          <div className="unity-card px-4 py-3.5">
+            <div className="flex items-center gap-2">
+              <Bookmark className="h-4 w-4 shrink-0 text-blue-600" />
+              <span className="flex-1 text-[13px] font-semibold text-slate-800">Saved checkout details</span>
+              <button
+                type="button"
+                onClick={forgetCheckoutDetails}
+                className="unity-tap rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-red-600 hover:bg-red-50"
+              >
+                Forget
+              </button>
+            </div>
+            <div className="mt-2 space-y-0.5 pl-6 text-[12px] text-slate-600">
+              {savedCheckout.phone && <p>{savedCheckout.phone}</p>}
+              {savedCheckout.address && <p className="whitespace-pre-line">{savedCheckout.address}</p>}
+              {savedCheckout.fulfillmentMethod && (
+                <p className="text-slate-500">
+                  {savedCheckout.fulfillmentMethod === "click_and_collect" ? "Click & collect" : "Delivery"}
+                  {savedCheckout.paymentMethod ? ` · ${paymentMethodLabel(savedCheckout.paymentMethod)}` : ""}
+                </p>
+              )}
+            </div>
           </div>
         )}
 

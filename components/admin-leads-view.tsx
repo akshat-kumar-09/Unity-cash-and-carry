@@ -341,7 +341,7 @@ export function AdminLeadsView() {
         {!loading && (
           <>
             {/* Pipeline Summary */}
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
               {PIPELINE_STAGES.map((stage) => {
                 const count = filteredLeads.filter((l) => l.status === stage.key).length
                 return (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useLayoutEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import {
   ShieldCheck,
@@ -22,6 +22,7 @@ import {
   Mail,
 } from "lucide-react"
 import { AppScreenHeader } from "@/components/app-screen-header"
+import { useOnTabShown } from "@/lib/tab-events"
 import { UnityLogo } from "@/components/unity-logo"
 import { UNITY_BUSINESS, VPD_EFFECTIVE_DATE, INVOICE_TERMS } from "@/lib/unity-business"
 
@@ -38,6 +39,7 @@ const CERTIFICATES = [
 type Order = {
   id: string
   orderNumber: string
+  status: string
   createdAt: string
   subtotal: number
   vat: number
@@ -65,7 +67,21 @@ export function RetailAssistView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [activePanel, setActivePanel] = useState<"hub" | "summary" | "business">("hub")
+  const [activePanel, setActivePanelState] = useState<"hub" | "summary" | "business">("hub")
+  // Panels replace the hub in place, so open each at its top, and return to the hub
+  // exactly where the retailer left it.
+  const hubScroll = useRef(0)
+  const panelChanged = useRef(false)
+  const setActivePanel = (panel: "hub" | "summary" | "business") => {
+    if (activePanel === "hub") hubScroll.current = window.scrollY
+    panelChanged.current = true
+    setActivePanelState(panel)
+  }
+  useLayoutEffect(() => {
+    if (!panelChanged.current) return
+    panelChanged.current = false
+    window.scrollTo(0, activePanel === "hub" ? hubScroll.current : 0)
+  }, [activePanel])
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null)
   const [showCertificates, setShowCertificates] = useState(false)
 
@@ -76,7 +92,8 @@ export function RetailAssistView() {
       const res = await fetch("/api/orders")
       if (!res.ok) throw new Error("Failed to load purchase history")
       const data = await res.json()
-      setOrders(Array.isArray(data) ? data : [])
+      // Cancelled orders never shipped, so they have no place in a duty ledger.
+      setOrders(Array.isArray(data) ? data.filter((o: Order) => o.status !== "cancelled") : [])
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong")
     } finally {
@@ -87,6 +104,7 @@ export function RetailAssistView() {
   useEffect(() => {
     fetchOrders()
   }, [])
+  useOnTabShown("assist", fetchOrders)
 
   const summaryStats = orders.reduce(
     (acc, order) => {
@@ -118,7 +136,7 @@ export function RetailAssistView() {
   }
 
   return (
-    <div className="relative flex min-h-[100dvh] flex-col overflow-hidden pb-28 md:max-w-4xl md:mx-auto md:w-full md:shadow-xl bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950">
+    <div className="relative flex min-h-[100dvh] flex-col overflow-hidden pb-40 md:max-w-4xl md:mx-auto md:w-full md:shadow-xl bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950">
       <div className="pointer-events-none absolute -right-16 top-24 h-56 w-56 rounded-full bg-white/5 blur-3xl" />
       <div className="pointer-events-none absolute -left-20 top-1/2 h-64 w-64 rounded-full bg-cyan-300/10 blur-3xl" />
       <div className="pointer-events-none absolute -right-10 bottom-32 h-40 w-40 rounded-full bg-white/5 blur-2xl" />
@@ -156,16 +174,16 @@ export function RetailAssistView() {
                   <button
                     type="button"
                     onClick={() => setShowCertificates(true)}
-                    className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[10.5px] font-black uppercase tracking-widest py-3 transition-all active:scale-[0.98] shadow-sm"
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[10.5px] font-black uppercase tracking-wider px-2 py-3 transition-all active:scale-[0.98] shadow-sm"
                   >
-                    <FileCheck2 className="h-3.5 w-3.5" /> View Certificates
+                    <FileCheck2 className="h-3.5 w-3.5 shrink-0" /> Certificates
                   </button>
                   <button
                     type="button"
                     onClick={() => setActivePanel("business")}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10.5px] font-black uppercase tracking-widest py-3 transition-all active:scale-[0.98]"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10.5px] font-black uppercase tracking-wider px-2 py-3 transition-all active:scale-[0.98]"
                   >
-                    <Building className="h-3.5 w-3.5" /> Full Details
+                    <Building className="h-3.5 w-3.5 shrink-0" /> Full Details
                   </button>
                 </div>
               </div>
@@ -245,7 +263,7 @@ export function RetailAssistView() {
 
             {/* MHRA — the honest "pending" slot: no schema, no fake reference, ready when the
                 real supplier docs arrive */}
-            <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/40 p-5 text-left">
+            <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50 p-5 shadow-sm text-left">
               <div className="flex items-start gap-3">
                 <Clock className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
                 <div>
@@ -329,7 +347,7 @@ export function RetailAssistView() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 text-left">
+            <div className="grid grid-cols-2 gap-3 text-left sm:grid-cols-3">
               <div className="p-4 rounded-2xl border border-slate-200/90 bg-white">
                 <p className="text-2xl font-black text-slate-900 leading-none">{summaryStats.totalOrders}</p>
                 <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-1.5 block">Purchases Made</p>
@@ -338,8 +356,8 @@ export function RetailAssistView() {
                 <p className="text-2xl font-black text-slate-900 leading-none">{(summaryStats.totalVolumeMl / 1000).toFixed(2)}L</p>
                 <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-1.5 block">Liquid Volume</p>
               </div>
-              <div className={`p-4 rounded-2xl border border-l-4 ${vpdIsLive ? "border-slate-200/90 border-l-emerald-500 bg-emerald-50" : "border-slate-200/90 border-l-slate-300 bg-slate-50"}`}>
-                <p className={`text-2xl font-black leading-none ${vpdIsLive ? "text-emerald-700" : "text-slate-500"}`}>£{summaryStats.totalDutyPaid.toFixed(2)}</p>
+              <div className={`col-span-2 sm:col-span-1 p-4 rounded-2xl border border-l-4 ${vpdIsLive ? "border-slate-200/90 border-l-emerald-500 bg-emerald-50" : "border-slate-200/90 border-l-slate-300 bg-slate-50"}`}>
+                <p className={`text-2xl font-black leading-none ${vpdIsLive ? "text-emerald-700" : "text-slate-500"}`}>£{summaryStats.totalDutyPaid.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-1.5 block">
                   VPD Paid {!vpdIsLive && "(from Oct '26)"}
                 </p>
@@ -373,8 +391,9 @@ export function RetailAssistView() {
                         onClick={() => setSelectedInvoiceOrder(o)}
                         className="w-full grid grid-cols-4 gap-2 px-4 py-3.5 items-center hover:bg-slate-50/70 transition-colors text-left focus:outline-none"
                       >
-                        <span className="font-mono font-bold text-blue-600 underline decoration-blue-600/30">{o.orderNumber.split("-")[1] || o.orderNumber}</span>
-                        <span className="text-slate-500">{formatDate(o.createdAt)}</span>
+                        {/* The short suffix is what tells orders apart; the invoice shows the full number. */}
+                        <span className="min-w-0 truncate font-mono font-bold text-blue-600 underline decoration-blue-600/30">{o.orderNumber.split("-").pop() || o.orderNumber}</span>
+                        <span className="min-w-0 truncate text-slate-500">{formatDate(o.createdAt)}</span>
                         <span className="text-right font-mono text-slate-700">{orderVol} ml</span>
                         <span className="text-right font-mono font-bold text-slate-700">£{o.vapeDutyAmount.toFixed(2)}</span>
                       </button>

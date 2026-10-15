@@ -66,6 +66,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false)
   const [isCartOpen, setIsCartOpen] = useState(false)
   const hasFetchedRef = useRef(false)
+  const lastSyncedRef = useRef<string | null>(null)
   const [serverCartLoaded, setServerCartLoaded] = useState(false)
 
   // Load cart from localStorage on mount — instant for guests, and a fallback until
@@ -87,7 +88,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     fetch("/api/cart")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data?.items) setItems(data.items)
+        if (data?.items) {
+          lastSyncedRef.current = JSON.stringify(data.items)
+          setItems(data.items)
+        }
       })
       .catch(() => {})
       .finally(() => setServerCartLoaded(true))
@@ -98,6 +102,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (status === "unauthenticated") {
       hasFetchedRef.current = false
+      lastSyncedRef.current = null
       setServerCartLoaded(false)
     }
   }, [status])
@@ -112,6 +117,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Also persist to the DB for logged-in users so it survives logout/login.
   useEffect(() => {
     if (!isHydrated || status !== "authenticated" || !serverCartLoaded) return
+    // Skip writing back exactly what the server just sent (every app open did this).
+    const snapshot = JSON.stringify(items)
+    if (snapshot === lastSyncedRef.current) return
+    lastSyncedRef.current = snapshot
     fetch("/api/cart", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

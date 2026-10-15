@@ -479,9 +479,10 @@ export function OrdersView() {
                           </p>
                         </div>
                         <p className="font-mono text-[10px] font-semibold text-slate-400 truncate">
-                          #{order.orderNumber} · {formatDate(order.createdAt)}
+                          {formatDate(order.createdAt)} · #{order.orderNumber}
                         </p>
                         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            <StatusPill status={order.status} />
                             {order.fulfillmentMethod === "click_and_collect" && (
                               <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[9.5px] font-black uppercase tracking-wider text-blue-700">
                                 <Package className="h-3 w-3" /> Collect
@@ -498,7 +499,6 @@ export function OrdersView() {
                                 </span>
                               )
                             )}
-                            <StatusPill status={order.status} />
                         </div>
                       </div>
 
@@ -510,6 +510,10 @@ export function OrdersView() {
                     {/* Expanded Order Items Details */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 bg-slate-50/60 p-4 space-y-3.5 text-left">
+                        {/* What the retailer needs next — the pass to show at the counter, or the
+                            bank details to pay — comes before the line items. */}
+                        {!order.collectedAt && <OrderPaymentPanel order={order} />}
+
                         {/* Products List */}
                         <div className="space-y-1.5">
                           <h4 className="px-0.5 text-[9.5px] font-black text-slate-400 uppercase tracking-widest">Items</h4>
@@ -517,9 +521,9 @@ export function OrdersView() {
                             {order.items?.map((item) => (
                               <div key={item.id} className="flex items-center justify-between gap-3 p-3">
                                 <div className="min-w-0">
-                                  <p className="text-[12.5px] font-bold text-slate-800 truncate">{item.product?.name || "Product details unavailable"}</p>
+                                  <p className="line-clamp-2 break-words text-[12.5px] font-bold leading-snug text-slate-800">{item.product?.name || "Product details unavailable"}</p>
                                   <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                                    {item.product?.brand} · {item.product?.sku}
+                                    {[item.product?.brand, item.product?.packLabel].filter(Boolean).join(" · ")}
                                   </p>
                                 </div>
                                 <div className="shrink-0 text-right">
@@ -605,27 +609,8 @@ export function OrdersView() {
                           </div>
                         </div>
 
-                        {/* Collect orders: the collection pass (paid at the counter). Delivery
-                            orders still owing: bank details and the payment reference. */}
-                        {order.status !== "cancelled" &&
-                          (payableMethod(order) === "counter" ? (
-                            order.collectionCode && (
-                              <CollectionPass
-                                code={order.collectionCode}
-                                amountDue={order.paymentStatus === "paid" ? 0 : order.total}
-                                readyAt={order.readyAt}
-                                collectedAt={order.collectedAt}
-                              />
-                            )
-                          ) : (
-                            order.paymentStatus === "unpaid" &&
-                            order.total > 0 &&
-                            order.paymentReference && (
-                              <div className="rounded-2xl border border-slate-150 bg-white p-3.5">
-                                <PaymentInstructions amount={order.total} reference={order.paymentReference} />
-                              </div>
-                            )
-                          ))}
+                        {/* Collected orders keep the pass down here as a record. */}
+                        {order.collectedAt && <OrderPaymentPanel order={order} />}
 
                         {/* Actions */}
                         <div className="flex flex-col gap-2 pt-1 sm:flex-row">
@@ -767,20 +752,21 @@ export function OrdersView() {
       {/* Invoice Generator Modal — portaled so it isn't trapped by any transformed ancestor */}
       {invoiceOrder && createPortal(
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto no-print">
-          <div className="bg-white rounded-3xl p-6 md:p-10 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative border border-slate-150">
+          <div className="bg-white rounded-3xl p-5 md:p-10 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative border border-slate-150">
             {/* Modal actions header */}
-            <div className="flex justify-between items-center pb-4 mb-6 border-b border-slate-100">
-              <h3 className="font-black text-sm uppercase tracking-wider text-slate-500">VAT Trade Invoice</h3>
-              <div className="flex items-center gap-2">
+            <div className="flex justify-between items-center gap-3 pb-4 mb-6 border-b border-slate-100">
+              <h3 className="min-w-0 truncate font-black text-sm uppercase tracking-wider text-slate-500">VAT Invoice</h3>
+              <div className="flex shrink-0 items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 px-4.5 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 shadow shadow-blue-600/10"
+                  className="unity-tap bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-bold shadow shadow-blue-600/10"
                 >
-                  <Printer className="h-4 w-4" /> Print / Save PDF
+                  <Printer className="h-4 w-4" /> Print / PDF
                 </button>
                 <button
                   onClick={() => setInvoiceOrder(null)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2.5 rounded-xl transition-colors"
+                  aria-label="Close invoice"
+                  className="unity-tap bg-slate-100 hover:bg-slate-200 text-slate-600 p-2.5 rounded-xl transition-colors"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -835,9 +821,9 @@ export function OrdersView() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                      <th className="p-3 pl-4">Brand / Product Description</th>
+                      <th className="p-3 pl-4">Product</th>
                       <th className="p-3 text-right">Qty</th>
-                      <th className="p-3 text-right">Case RRP</th>
+                      <th className="p-3 text-right">Case price</th>
                       <th className="p-3 text-right pr-4">Total</th>
                     </tr>
                   </thead>
@@ -846,7 +832,7 @@ export function OrdersView() {
                       <tr key={item.id}>
                         <td className="p-3 pl-4">
                           <p className="font-bold text-slate-800">{item.product?.name}</p>
-                          <span className="text-[9px] font-mono text-slate-500 block mt-0.5">SKU: {item.product?.sku}</span>
+                          <span className="text-[9px] font-mono text-slate-500 hidden sm:block print:block mt-0.5">SKU: {item.product?.sku}</span>
                         </td>
                         <td className="p-3 text-right font-mono font-bold text-slate-700">{item.quantity}</td>
                         <td className="p-3 text-right font-mono text-slate-500">£{item.unitPrice.toFixed(2)}</td>
@@ -867,7 +853,7 @@ export function OrdersView() {
                     <p>Payment Reference: <span className="font-mono font-semibold text-slate-700">{invoiceOrder.paymentReference}</span></p>
                   )}
                 </div>
-                <div className="w-64 space-y-2 text-xs font-semibold text-slate-500 shrink-0">
+                <div className="w-full sm:w-64 space-y-2 text-xs font-semibold text-slate-500 shrink-0">
                   <div className="flex justify-between">
                     <span>Subtotal (ex. VAT)</span>
                     <span className="font-mono font-bold text-slate-800">£{invoiceOrder.subtotal.toFixed(2)}</span>
@@ -915,6 +901,29 @@ export function OrdersView() {
         </div>,
         document.body
       )}
+    </div>
+  )
+}
+
+/** Collect orders: the collection pass (paid at the counter). Delivery orders still owing:
+ *  bank details and the payment reference. */
+function OrderPaymentPanel({ order }: { order: Order }) {
+  if (order.status === "cancelled") return null
+  if (payableMethod(order) === "counter") {
+    if (!order.collectionCode) return null
+    return (
+      <CollectionPass
+        code={order.collectionCode}
+        amountDue={order.paymentStatus === "paid" ? 0 : order.total}
+        readyAt={order.readyAt}
+        collectedAt={order.collectedAt}
+      />
+    )
+  }
+  if (order.paymentStatus !== "unpaid" || order.total <= 0 || !order.paymentReference) return null
+  return (
+    <div className="rounded-2xl border border-slate-150 bg-white p-3.5">
+      <PaymentInstructions amount={order.total} reference={order.paymentReference} />
     </div>
   )
 }

@@ -8,7 +8,7 @@ import { useCart } from "@/lib/cart-context"
 import { triggerCartAddedFeedback } from "@/lib/cart-feedback"
 import type { Product } from "@/lib/products"
 import type { ProposedBasket } from "@/lib/assist-tools"
-import { MessageCircle, X, Send, Mail, Square, ShieldAlert, PackageX, ChevronLeft, Maximize2, Minimize2, Mic, ShoppingCart, MapPin } from "lucide-react"
+import { MessageCircle, X, Send, Mail, Square, ShieldAlert, PackageX, ChevronLeft, Maximize2, Minimize2, Mic, ShoppingCart, MapPin, RotateCcw } from "lucide-react"
 
 // From the Unity Cash & Carry invoice header — confirm this is WhatsApp-enabled
 // (it's listed there as a landline) before relying on it in production.
@@ -163,7 +163,7 @@ export function UnityAssistWidget() {
     recognition.start()
   }
 
-  const { messages, sendMessage, status, stop, setMessages } = useChat({
+  const { messages, sendMessage, regenerate, status, stop, setMessages } = useChat({
     transport: new DefaultChatTransport({ api: "/api/assist/chat" }),
   })
 
@@ -219,7 +219,7 @@ export function UnityAssistWidget() {
             className={`flex w-full flex-col overflow-hidden bg-slate-50 shadow-2xl animate-in duration-300 ${
               expanded
                 ? "h-full slide-in-from-bottom-1"
-                : "max-h-[88dvh] rounded-t-3xl slide-in-from-bottom sm:mx-4 sm:max-h-[80vh] sm:max-w-md sm:rounded-3xl sm:zoom-in-95 sm:slide-in-from-bottom-4"
+                : "h-[88dvh] rounded-t-3xl slide-in-from-bottom sm:mx-4 sm:h-[80vh] sm:max-h-[720px] sm:max-w-md sm:rounded-3xl sm:zoom-in-95 sm:slide-in-from-bottom-4"
             }`}
             onClick={(e) => e.stopPropagation()}
           >
@@ -355,7 +355,14 @@ export function UnityAssistWidget() {
               )}
               {status === "error" && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-[12.5px] font-medium text-red-700">
-                  Something went wrong getting a reply. Try again, or message the team below.
+                  <p>Something went wrong getting a reply. Try again, or message the team below.</p>
+                  <button
+                    type="button"
+                    onClick={() => regenerate().catch(() => {})}
+                    className="unity-tap mt-2 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-red-700 shadow-sm ring-1 ring-red-200"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" /> Try again
+                  </button>
                 </div>
               )}
             </div>

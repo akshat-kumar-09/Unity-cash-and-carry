@@ -17,8 +17,15 @@ export function useOnTabShown(tab: AppTab, onShown: () => void) {
   callback.current = onShown
 
   useEffect(() => {
+    // A tab mounts in the same commit the shell announces it, so the first announcement
+    // would just repeat the component's own mount-time load. Skip anything that arrives
+    // before this commit's effects finish.
+    let mounting = true
+    queueMicrotask(() => {
+      mounting = false
+    })
     const handler = (e: Event) => {
-      if ((e as CustomEvent<AppTab>).detail === tab) callback.current()
+      if (!mounting && (e as CustomEvent<AppTab>).detail === tab) callback.current()
     }
     window.addEventListener(TAB_SHOWN_EVENT, handler)
     return () => window.removeEventListener(TAB_SHOWN_EVENT, handler)

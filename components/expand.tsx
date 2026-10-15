@@ -6,13 +6,24 @@ import { usePrefersReducedMotion } from "@/lib/reduced-motion"
 /** Grows its content open from zero height when it mounts — a smooth reveal for
  *  accordion bodies instead of content popping in. Height animates via grid rows
  *  (0fr → 1fr), so it follows the content's real height, including content that arrives
- *  after a fetch. Clipping is lifted once open so nothing inside gets cut off. */
-export function Expand({ children, className = "" }: { children: ReactNode; className?: string }) {
+ *  after a fetch. Clipping is lifted once open so nothing inside gets cut off.
+ *  `appear={false}` renders already open — for sections open by default on page load,
+ *  which shouldn't paint empty and then grow. */
+export function Expand({
+  children,
+  className = "",
+  appear = true,
+}: {
+  children: ReactNode
+  className?: string
+  appear?: boolean
+}) {
   const reducedMotion = usePrefersReducedMotion()
-  const [open, setOpen] = useState(false)
-  const [settled, setSettled] = useState(false)
+  const [open, setOpen] = useState(!appear)
+  const [settled, setSettled] = useState(!appear)
 
   useEffect(() => {
+    if (!appear) return
     if (reducedMotion) {
       setOpen(true)
       setSettled(true)
@@ -30,7 +41,7 @@ export function Expand({ children, className = "" }: { children: ReactNode; clas
       cancelAnimationFrame(inner)
       clearTimeout(done)
     }
-  }, [reducedMotion])
+  }, [reducedMotion, appear])
 
   return (
     <div

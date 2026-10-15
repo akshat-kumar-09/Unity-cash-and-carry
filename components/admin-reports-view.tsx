@@ -35,10 +35,16 @@ export function AdminReportsView() {
   // Deadline Tracker Calculations
   const deadlines = useMemo(() => {
     const today = new Date()
-    // Submissions due 7th of next month
-    const nextMonthSub = new Date(today.getFullYear(), today.getMonth() + 1, 7)
-    // Payment due 15th of next month
-    const nextMonthPay = new Date(today.getFullYear(), today.getMonth() + 1, 15)
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    // The soonest upcoming `day` of a month — this month's if it hasn't passed yet.
+    const nextOn = (day: number) => {
+      const thisMonth = new Date(today.getFullYear(), today.getMonth(), day)
+      return thisMonth >= startOfToday ? thisMonth : new Date(today.getFullYear(), today.getMonth() + 1, day)
+    }
+    // Submissions due on the 7th
+    const nextMonthSub = nextOn(7)
+    // Payment due on the 15th
+    const nextMonthPay = nextOn(15)
 
     const diffSub = nextMonthSub.getTime() - today.getTime()
     const diffPay = nextMonthPay.getTime() - today.getTime()
@@ -146,8 +152,16 @@ export function AdminReportsView() {
                 <p className="text-[12px] font-bold text-slate-700">Next Return Submission</p>
                 <p className="text-[10px] text-slate-500 mt-0.5">Due date: {deadlines.submissionDate}</p>
                 <div className="flex items-center gap-1.5 mt-2">
-                  <span className="text-[16px] font-black text-blue-700">{deadlines.daysToSub}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Days remaining</span>
+                  {deadlines.daysToSub === 0 ? (
+                    <span className="text-[13px] font-black uppercase tracking-wider text-blue-700">Due today</span>
+                  ) : (
+                    <>
+                      <span className="text-[16px] font-black text-blue-700">{deadlines.daysToSub}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        {deadlines.daysToSub === 1 ? "Day remaining" : "Days remaining"}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -155,10 +169,18 @@ export function AdminReportsView() {
               <Landmark className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <p className="text-[12px] font-bold text-slate-700">Next Excise Payment</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">Due date: {deadlines.daysToPay}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Due date: {deadlines.paymentDate}</p>
                 <div className="flex items-center gap-1.5 mt-2">
-                  <span className="text-[16px] font-black text-amber-700">{deadlines.daysToPay}</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Days remaining</span>
+                  {deadlines.daysToPay === 0 ? (
+                    <span className="text-[13px] font-black uppercase tracking-wider text-amber-700">Due today</span>
+                  ) : (
+                    <>
+                      <span className="text-[16px] font-black text-amber-700">{deadlines.daysToPay}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        {deadlines.daysToPay === 1 ? "Day remaining" : "Days remaining"}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

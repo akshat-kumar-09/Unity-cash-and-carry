@@ -29,3 +29,21 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to load checkout details" }, { status: 500 })
   }
 }
+
+/** Forget the remembered checkout details (Account → Saved checkout details → Forget). */
+export async function DELETE() {
+  try {
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+    await prisma.user.update({
+      where: { id: (session.user as any).id },
+      data: { savedPhone: null, savedAddress: null, savedFulfillment: null, savedPaymentMethod: null },
+    })
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error("Error forgetting checkout details:", error)
+    return NextResponse.json({ error: "Failed to forget checkout details" }, { status: 500 })
+  }
+}

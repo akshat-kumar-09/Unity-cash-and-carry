@@ -135,6 +135,8 @@ function BrandDrilldownCard({
   onProductUpdated?: () => void
 }) {
   const [expanded, setExpanded] = useState(defaultOpen)
+  // Open by default on load: show it open from the first paint. Only a tap animates.
+  const [animateOpen, setAnimateOpen] = useState(!defaultOpen)
   const [openBrand, setOpenBrand] = useState<string | null>(null)
   const { brands: dynamicBrands, loading: loadingBrands } = useDynamicBrands(
     def.id,
@@ -147,7 +149,12 @@ function BrandDrilldownCard({
     <div className="relative overflow-hidden rounded-2xl border border-dashed border-blue-300/80 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner">
       <button
         type="button"
-        onClick={(e) => anchorScroll(e.currentTarget, () => setExpanded((open) => !open))}
+        onClick={(e) =>
+          anchorScroll(e.currentTarget, () => {
+            setAnimateOpen(true)
+            setExpanded((open) => !open)
+          })
+        }
         className="unity-tap flex w-full items-center justify-between px-3.5 py-3 text-left"
         aria-expanded={expanded}
       >
@@ -164,7 +171,7 @@ function BrandDrilldownCard({
         />
       </button>
       {expanded && (
-        <Expand>
+        <Expand appear={animateOpen}>
         <div className="border-t border-dashed border-blue-200/80 px-2.5 pb-2.5 pt-2">
           <div className="overflow-hidden rounded-2xl border border-blue-200/70 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner">
             {loadingBrands && brands.length === 0 &&

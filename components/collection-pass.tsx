@@ -50,10 +50,10 @@ export function CollectionPass({ code, amountDue, readyAt, collectedAt }: Collec
               : "bg-blue-50 text-blue-700"
         }`}
       >
-        {state === "collected" ? <CheckCircle2 className="h-4 w-4" /> : state === "ready" ? <Store className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+        {state === "collected" ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : state === "ready" ? <Store className="h-4 w-4 shrink-0" /> : <Clock className="h-4 w-4 shrink-0" />}
         {state === "collected" && `Collected ${formatTime(collectedAt!)}`}
         {state === "ready" && "Ready to collect"}
-        {state === "preparing" && "Preparing — we'll text you when it's ready"}
+        {state === "preparing" && "Preparing — we'll text when ready"}
       </div>
 
       {state !== "collected" && (
