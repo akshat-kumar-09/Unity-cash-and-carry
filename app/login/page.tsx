@@ -3,8 +3,24 @@
 import { Suspense, useState, useEffect } from "react"
 import { signIn, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Shield, Mail, Lock, ExternalLink } from "lucide-react"
+import { Shield, Mail, Lock, ExternalLink, Phone } from "lucide-react"
 import { UnityLogo } from "@/components/unity-logo"
+import { UNITY_BUSINESS } from "@/lib/unity-business"
+
+/** Brand mark on the login gradient while the session check runs — the same moment the
+ *  app shows its splash, instead of a "Loading..." line. */
+function LoginSplash() {
+  return (
+    <div className="min-h-screen min-h-[100dvh] auth-page-bg flex items-center justify-center">
+      <div className="rounded-3xl border border-white/25 bg-white/15 p-3 shadow-2xl backdrop-blur-sm">
+        <div className="rounded-2xl bg-white p-2">
+          <UnityLogo size={64} />
+        </div>
+      </div>
+      <span className="sr-only">Loading</span>
+    </div>
+  )
+}
 
 const MARKETING_REGISTER_URL =
   typeof process.env.NEXT_PUBLIC_MARKETING_REGISTER_URL === "string"
@@ -70,13 +86,7 @@ function LoginPageContent() {
   }, [status, router, callbackUrl])
 
   if (status === "loading" || checkingGate) {
-    return (
-      <div className="min-h-screen min-h-[100dvh] auth-page-bg flex items-center justify-center">
-        <div className="animate-pulse text-white/80 font-mono text-sm uppercase tracking-wider">
-          Loading...
-        </div>
-      </div>
-    )
+    return <LoginSplash />
   }
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -228,9 +238,14 @@ function LoginPageContent() {
                 <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
               </a>
             ) : (
-              <p className="text-center text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                Set <code className="font-mono text-[11px]">NEXT_PUBLIC_MARKETING_REGISTER_URL</code> in Vercel to link to your application form.
-              </p>
+              // No application link configured — give retailers a way in, never a setup note.
+              <a
+                href={`tel:${UNITY_BUSINESS.phone.replace(/\s+/g, "")}`}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50/80 py-3 text-sm font-bold uppercase tracking-wider text-blue-800 transition hover:bg-blue-100"
+              >
+                <Phone className="h-4 w-4 shrink-0" aria-hidden />
+                Call {UNITY_BUSINESS.phone} to apply
+              </a>
             )}
           </div>
         </div>
@@ -249,13 +264,7 @@ function LoginPageContent() {
 export default function LoginPage() {
   return (
     <Suspense
-      fallback={
-        <div className="min-h-screen min-h-[100dvh] auth-page-bg flex items-center justify-center">
-          <div className="animate-pulse text-white/80 font-mono text-sm uppercase tracking-wider">
-            Loading...
-          </div>
-        </div>
-      }
+      fallback={<LoginSplash />}
     >
       <LoginPageContent />
     </Suspense>

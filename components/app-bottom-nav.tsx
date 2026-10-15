@@ -62,27 +62,20 @@ export function AppBottomNav({ activeTab, onTabChange, isAdmin = false }: AppBot
                 key={id}
                 type="button"
                 onClick={() => onTabChange(id)}
-                className={`unity-tap relative flex min-h-[58px] min-w-[58px] flex-1 flex-col items-center justify-center gap-1 py-1.5 transition-all duration-300 ${
-                  isActive
-                    ? "text-blue-600 scale-[1.03]"
-                    : "text-slate-400 hover:text-slate-600 active:scale-95"
+                className={`unity-tap relative flex min-h-[58px] min-w-[58px] flex-1 flex-col items-center justify-center gap-1 py-1.5 ${
+                  isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
                 }`}
                 aria-current={isActive ? "page" : undefined}
                 aria-label={label}
               >
-                {isActive && (
-                  <div className="absolute w-10 h-10 rounded-full bg-blue-500/10 blur-[8px] scale-125 pointer-events-none transition-all duration-500 animate-pulse" />
-                )}
                 <Icon
-                  className={`h-[22px] w-[22px] transition-all duration-300 ${
-                    isActive
-                      ? "stroke-[2.25px] scale-110 drop-shadow-[0_2px_8px_rgba(37,99,235,0.3)]"
-                      : "stroke-[1.75px]"
+                  className={`h-[22px] w-[22px] transition-[stroke-width] duration-200 ${
+                    isActive ? "stroke-[2.25px]" : "stroke-[1.75px]"
                   }`}
                 />
                 <span
-                  className={`text-[9.5px] font-black uppercase tracking-widest transition-all duration-300 ${
-                    isActive ? "text-blue-700 opacity-100" : "opacity-85"
+                  className={`text-[9.5px] font-black uppercase tracking-widest transition-colors duration-200 ${
+                    isActive ? "text-blue-700" : ""
                   }`}
                 >
                   {label}

@@ -25,6 +25,7 @@ import {
   ImagePlus,
 } from "lucide-react"
 import { AppScreenHeader } from "@/components/app-screen-header"
+import { useOnTabShown } from "@/lib/tab-events"
 import { toast } from "sonner"
 
 type PromoBanner = { id: string; imageUrl: string; altText: string; sortOrder?: number; isActive?: boolean }
@@ -438,6 +439,11 @@ export function OffersView() {
     fetchWalletData()
   }, [])
 
+  // Back on Rewards after ordering with credits: show the new balance, no spinner.
+  useOnTabShown("offers", () => {
+    void fetchWalletData()
+  })
+
   const handleRefreshWallet = () => {
     setWalletRefreshing(true)
     fetchWalletData(true)
@@ -701,7 +707,7 @@ export function OffersView() {
               {walletLoading ? (
                 <div className="mt-1 h-5 w-20 animate-pulse rounded bg-white/15" />
               ) : (
-                <p className="text-xl font-black leading-tight tracking-tight">£{balance.toFixed(2)}</p>
+                <p className="text-xl font-black leading-tight tracking-tight">£{(Math.round(balance * 100) / 100 || 0).toFixed(2)}</p>
               )}
             </div>
           </div>

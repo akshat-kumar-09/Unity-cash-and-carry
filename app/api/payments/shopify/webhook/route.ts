@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyWebhookHmac } from "@/lib/shopify"
 
-// Fires when a draft order's invoice gets paid (or any other order is paid, but we only
-// care about ones carrying our tag). Tags survive a draft order -> completed order
-// conversion, so `unity-order:<orderNumber>` on the draft order comes back here on the
-// paid Order payload — that's how we match it back without a stored Shopify order id.
+// Shopify calls this for every paid order in the store. Only ones carrying our
+// `unity-order:<orderNumber>` tag matter: those are invoices issued back when the app
+// offered card payment through Shopify's checkout. The app no longer issues them (payment
+// is by bank transfer or cash on collection), so this now only settles any still open.
 export async function POST(request: NextRequest) {
   const rawBody = await request.text()
   const hmac = request.headers.get("x-shopify-hmac-sha256")

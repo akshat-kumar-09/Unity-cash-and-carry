@@ -16,12 +16,18 @@ import {
   ClipboardList,
   Phone,
   MapPin,
+  Store,
+  MessageSquare,
+  Banknote,
+  CreditCard,
 } from "lucide-react"
 import { AppScreenHeader } from "@/components/app-screen-header"
 import { toast } from "sonner"
 import { getProductImageUrl } from "@/lib/products"
+import { payableMethod, paymentMethodLabel, type CounterPaymentMethod, type PaymentStatus } from "@/lib/payment"
 import { BookkeepingSummary } from "@/components/bookkeeping-summary"
 import { AdminTrendingShelf } from "@/components/admin-trending-shelf"
+import { useOnTabShown } from "@/lib/tab-events"
 
 type OrderItem = {
   id: string
@@ -52,6 +58,14 @@ type Order = {
   fulfillmentMethod: string
   notes: string | null
   createdAt: string
+  paymentStatus: string
+  paymentMethod: string | null
+  paymentReference: string | null
+  paidAt: string | null
+  collectionCode: string | null
+  readyAt: string | null
+  readyNotice: string | null
+  collectedAt: string | null
   user?: { name: string | null; email: string }
   items?: OrderItem[]
 }
@@ -88,6 +102,20 @@ function StatusPill({ status }: { status: string }) {
       {status}
     </span>
   )
+}
+
+/** Money is still owed on it — the orders to chase, or to match against the bank statement. */
+function isAwaitingPayment(order: Order): boolean {
+  return order.paymentStatus === "unpaid" && order.total > 0 && order.status !== "cancelled"
+}
+
+/** Click & collect orders still waiting at the depot — what counter staff work through. */
+function isAwaitingCollection(order: Order): boolean {
+  return order.fulfillmentMethod === "click_and_collect" && !order.collectedAt && order.status !== "cancelled"
+}
+
+function isToday(iso: string | null): boolean {
+  return Boolean(iso) && new Date(iso!).toDateString() === new Date().toDateString()
 }
 
 function orderBrief(order: Order): string {
@@ -136,9 +164,9 @@ export function AdminOrdersView() {
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(true)
 
-  const fetchOrders = async (showToast = false) => {
+  const fetchOrders = async (showToast = false, quiet = false) => {
     try {
-      setLoading(true)
+      if (!quiet) setLoading(true)
       const res = await fetch("/api/orders")
       if (!res.ok) throw new Error("Failed to load orders")
       const data = await res.json()
@@ -169,6 +197,11 @@ export function AdminOrdersView() {
     fetchOrders()
     fetchAnalytics()
   }, [])
+
+  // Coming back to Orders refreshes in place — new orders appear without a spinner.
+  useOnTabShown("orders", () => {
+    void fetchOrders(false, true)
+  })
 
   const formatDate = (dateStr: string) => {
     try {
@@ -205,6 +238,62 @@ export function AdminOrdersView() {
     }
   }
 
+  const handleSetPaymentStatus = async (orderId: string, paymentStatus: PaymentStatus) => {
+    setUpdatingId(orderId)
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentStatus }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to update payment")
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, paymentStatus: data.paymentStatus, paidAt: data.paidAt } : o))
+      )
+      toast.success(paymentStatus === "paid" ? "Order marked paid" : "Order marked unpaid")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update payment")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleMarkReady = async (order: Order) => {
+    setUpdatingId(order.id)
+    try {
+      const res = await fetch(`/api/orders/${order.id}/ready`, { method: "POST" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to mark ready")
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...data.order } : o)))
+      if (data.sms?.ok) toast.success(`Ready — texted ${data.sms.to}`)
+      else toast.warning(`Marked ready, but the text wasn't sent: ${data.sms?.reason ?? "unknown reason"}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not mark ready")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleCollected = async (order: Order, paymentMethod?: CounterPaymentMethod) => {
+    setUpdatingId(order.id)
+    try {
+      const res = await fetch(`/api/orders/${order.id}/collect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(paymentMethod ? { paymentMethod } : {}),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to record collection")
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...data } : o)))
+      toast.success(paymentMethod ? `Collected — paid by ${paymentMethod}` : "Collected")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not record collection")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
   const toggleSelected = (orderId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -236,7 +325,11 @@ export function AdminOrdersView() {
   }
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: orders.length }
+    const c: Record<string, number> = {
+      all: orders.length,
+      unpaid: orders.filter(isAwaitingPayment).length,
+      "to collect": orders.filter(isAwaitingCollection).length,
+    }
     for (const o of orders) c[o.status] = (c[o.status] || 0) + 1
     return c
   }, [orders])
@@ -244,16 +337,39 @@ export function AdminOrdersView() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return orders.filter((o) => {
-      if (statusFilter !== "all" && o.status !== statusFilter) return false
+      if (statusFilter === "unpaid") {
+        if (!isAwaitingPayment(o)) return false
+      } else if (statusFilter === "to collect") {
+        if (!isAwaitingCollection(o)) return false
+      } else if (statusFilter !== "all" && o.status !== statusFilter) return false
       if (!q) return true
       return (
         o.orderNumber.toLowerCase().includes(q) ||
+        (o.paymentReference ?? "").toLowerCase().includes(q) ||
+        (o.collectionCode ?? "").toLowerCase().includes(q) ||
         (o.customerName ?? "").toLowerCase().includes(q) ||
         (o.customerPhone ?? "").toLowerCase().includes(q) ||
         (o.user?.email ?? "").toLowerCase().includes(q)
       )
     })
   }, [orders, statusFilter, search])
+
+  // Today's counter takings — what should be in the till (cash) and on the card machine.
+  const counterToday = useMemo(() => {
+    const taken = orders.filter(
+      (o) => o.fulfillmentMethod === "click_and_collect" && isToday(o.collectedAt) && isToday(o.paidAt)
+    )
+    const sum = (method: string) => taken.filter((o) => o.paymentMethod === method)
+    const cash = sum("cash")
+    const card = sum("card")
+    return {
+      cashTotal: cash.reduce((t, o) => t + o.total, 0),
+      cashCount: cash.length,
+      cardTotal: card.reduce((t, o) => t + o.total, 0),
+      cardCount: card.length,
+      waiting: orders.filter(isAwaitingCollection).length,
+    }
+  }, [orders])
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col overflow-hidden pb-28 md:max-w-4xl md:mx-auto md:w-full md:shadow-xl bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950">
@@ -286,14 +402,38 @@ export function AdminOrdersView() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search order #, retailer, phone..."
+                placeholder="Search order #, ref, collection code…"
                 className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-blue-100/50 focus:outline-none"
               />
             </div>
           </div>
 
+          {(counterToday.cashCount > 0 || counterToday.cardCount > 0 || counterToday.waiting > 0) && (
+            <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/15 bg-white/10 p-2.5 text-white">
+              <div className="rounded-xl bg-white/10 px-2.5 py-2">
+                <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-blue-100/80"><Banknote className="h-3 w-3" /> Cash today</p>
+                <p className="font-mono text-[15px] font-black">£{counterToday.cashTotal.toFixed(2)}</p>
+                <p className="text-[10px] text-blue-100/70">{counterToday.cashCount} collection{counterToday.cashCount === 1 ? "" : "s"}</p>
+              </div>
+              <div className="rounded-xl bg-white/10 px-2.5 py-2">
+                <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-blue-100/80"><CreditCard className="h-3 w-3" /> Card today</p>
+                <p className="font-mono text-[15px] font-black">£{counterToday.cardTotal.toFixed(2)}</p>
+                <p className="text-[10px] text-blue-100/70">{counterToday.cardCount} collection{counterToday.cardCount === 1 ? "" : "s"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("to collect")}
+                className="rounded-xl bg-white/10 px-2.5 py-2 text-left transition-colors hover:bg-white/20"
+              >
+                <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-blue-100/80"><Store className="h-3 w-3" /> To collect</p>
+                <p className="font-mono text-[15px] font-black">{counterToday.waiting}</p>
+                <p className="text-[10px] text-blue-100/70">waiting at depot</p>
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {["all", ...STATUS_OPTIONS].map((s) => (
+            {["all", "to collect", "unpaid", ...STATUS_OPTIONS].map((s) => (
               <button
                 key={s}
                 type="button"
@@ -357,6 +497,7 @@ export function AdminOrdersView() {
               {filtered.map((order) => {
                 const isExpanded = expandedId === order.id
                 const isSelected = selectedIds.has(order.id)
+                const isPaid = order.paymentStatus === "paid"
                 return (
                   <li
                     key={order.id}
@@ -410,18 +551,21 @@ export function AdminOrdersView() {
                             <p className="shrink-0 text-[14px] font-black text-slate-900">£{order.total.toFixed(2)}</p>
                           </div>
                           <p className="text-[10.5px] font-semibold text-slate-500 truncate">{orderBrief(order)}</p>
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-mono text-[10px] font-semibold text-slate-400 truncate">
-                              #{order.orderNumber} · {formatDate(order.createdAt)}
-                            </p>
-                            <div className="flex items-center gap-1.5">
+                          <p className="font-mono text-[10px] font-semibold text-slate-400 truncate">
+                            #{order.orderNumber} · {formatDate(order.createdAt)}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                               {order.fulfillmentMethod === "click_and_collect" && (
                                 <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[9.5px] font-black uppercase tracking-wider text-blue-700">
                                   <Package className="h-3 w-3" /> Collect
                                 </span>
                               )}
+                              {isAwaitingPayment(order) && (
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider text-red-600">
+                                  Unpaid
+                                </span>
+                              )}
                               <StatusPill status={order.status} />
-                            </div>
                           </div>
                         </div>
 
@@ -476,6 +620,114 @@ export function AdminOrdersView() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Collection: get it ready (texts the retailer), then hand over and take payment */}
+                        {order.fulfillmentMethod === "click_and_collect" && order.status !== "cancelled" && (
+                          <div className="rounded-2xl border border-slate-150 bg-white p-3.5">
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <h4 className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest">Collection</h4>
+                              {order.collectionCode && (
+                                <span className="font-mono text-[12px] font-black tracking-widest text-slate-700">{order.collectionCode}</span>
+                              )}
+                            </div>
+                            <div className="space-y-0.5 text-[12px]">
+                              <p className="font-bold text-slate-800">
+                                {order.total <= 0 || isPaid
+                                  ? `Paid${order.paymentMethod ? ` · ${paymentMethodLabel(order.paymentMethod)}` : ""}`
+                                  : `£${order.total.toFixed(2)} due at the counter${order.paymentMethod ? ` · prefers ${paymentMethodLabel(order.paymentMethod).toLowerCase()}` : ""}`}
+                              </p>
+                              <p className={`font-semibold ${order.collectedAt ? "text-emerald-600" : order.readyAt ? "text-blue-700" : "text-slate-500"}`}>
+                                {order.collectedAt
+                                  ? `Collected ${formatDate(order.collectedAt)}`
+                                  : order.readyAt
+                                    ? `Ready since ${formatDate(order.readyAt)}`
+                                    : "Not marked ready yet"}
+                              </p>
+                              {order.readyNotice && !order.collectedAt && (
+                                <p className={`flex items-center gap-1 ${order.readyNotice.startsWith("Texted") ? "text-slate-500" : "text-amber-700"}`}>
+                                  <MessageSquare className="h-3 w-3 shrink-0" /> {order.readyNotice}
+                                </p>
+                              )}
+                            </div>
+                            {!order.collectedAt && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={updatingId === order.id}
+                                  onClick={() => handleMarkReady(order)}
+                                  className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[11px] font-bold uppercase tracking-wide transition disabled:opacity-40 ${
+                                    order.readyAt
+                                      ? "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                                      : "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
+                                  }`}
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5" /> {order.readyAt ? "Text again" : "Ready — text customer"}
+                                </button>
+                                {order.total > 0 && !isPaid ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={updatingId === order.id}
+                                      onClick={() => handleCollected(order, "cash")}
+                                      className="flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                                    >
+                                      <Banknote className="h-3.5 w-3.5" /> Collected · cash
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={updatingId === order.id}
+                                      onClick={() => handleCollected(order, "card")}
+                                      className="flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                                    >
+                                      <CreditCard className="h-3.5 w-3.5" /> Collected · card
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={updatingId === order.id}
+                                    onClick={() => handleCollected(order)}
+                                    className="flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Collected
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Payment: what's owed, how, and the reference to match on the bank statement */}
+                        {order.total > 0 && order.fulfillmentMethod !== "click_and_collect" && (
+                          <div className="rounded-2xl border border-slate-150 bg-white p-3.5">
+                            <h4 className="mb-2 text-[9.5px] font-black text-slate-400 uppercase tracking-widest">Payment</h4>
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0 space-y-0.5 text-[12px]">
+                                <p className="font-bold text-slate-800">
+                                  {paymentMethodLabel(isPaid ? order.paymentMethod : payableMethod(order))} · £{order.total.toFixed(2)}
+                                </p>
+                                {order.paymentReference && (
+                                  <p className="font-mono font-semibold text-slate-500">Ref {order.paymentReference}</p>
+                                )}
+                                <p className={`font-semibold ${isPaid ? "text-emerald-600" : "text-red-600"}`}>
+                                  {isPaid ? `Paid${order.paidAt ? ` ${formatDate(order.paidAt)}` : ""}` : "Awaiting payment"}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={updatingId === order.id}
+                                onClick={() => handleSetPaymentStatus(order.id, isPaid ? "unpaid" : "paid")}
+                                className={`shrink-0 rounded-xl border px-3 py-2 text-[11px] font-bold uppercase tracking-wide transition disabled:opacity-40 ${
+                                  isPaid
+                                    ? "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                                    : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+                                }`}
+                              >
+                                {isPaid ? "Mark as unpaid" : "Mark as paid"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Admin's extra edit feature: update order status directly */}
                         <div className="rounded-2xl border border-slate-150 bg-white p-3.5">

@@ -6,6 +6,7 @@ import './globals.css'
 import { ThemeProvider } from "@/components/theme-provider"
 import { Providers } from "@/components/providers"
 import { PwaRegister } from "@/components/pwa-register"
+import { Toaster } from "sonner"
 
 const _inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const _spaceMono = Space_Mono({
@@ -69,6 +70,10 @@ export default function RootLayout({
             <div className="min-h-[100dvh] md:bg-slate-200">
               {children}
             </div>
+            {/* Every toast.success/error in the app renders here — top, clear of the
+                bottom nav and the floating cart bar. */}
+            <Toaster position="top-center" richColors duration={2600} offset={14} />
+
           </ThemeProvider>
         </Providers>
       </body>

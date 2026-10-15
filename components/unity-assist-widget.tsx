@@ -2,8 +2,13 @@
 
 import { useEffect, useRef, useState, type ComponentType } from "react"
 import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport } from "ai"
-import { MessageCircle, X, Send, Mail, Square, ShieldAlert, Landmark, Zap, PackageX, ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
+import { DefaultChatTransport, getToolName, isToolUIPart } from "ai"
+import { useHideWhileScrollingDown } from "@/lib/floating-ui"
+import { useCart } from "@/lib/cart-context"
+import { triggerCartAddedFeedback } from "@/lib/cart-feedback"
+import type { Product } from "@/lib/products"
+import type { ProposedBasket } from "@/lib/assist-tools"
+import { MessageCircle, X, Send, Mail, Square, ShieldAlert, PackageX, ChevronLeft, Maximize2, Minimize2, Mic, ShoppingCart, MapPin } from "lucide-react"
 
 // From the Unity Cash & Carry invoice header — confirm this is WhatsApp-enabled
 // (it's listed there as a landline) before relying on it in production.
@@ -17,19 +22,19 @@ const SUPPORT_EMAIL = "support@unitycashandcarry.com"
  *  set, not a plain FAQ dump. */
 const STARTER_PROMPTS: { icon: ComponentType<{ className?: string }>; tag: string; text: string }[] = [
   {
+    icon: ShoppingCart,
+    tag: "Ordering",
+    text: "Build me my usual order",
+  },
+  {
+    icon: MapPin,
+    tag: "Buying",
+    text: "What's selling near me that I don't stock yet?",
+  },
+  {
     icon: ShieldAlert,
     tag: "Compliance",
     text: "What happens if HMRC finds banned stock during a spot-check — walk me through it",
-  },
-  {
-    icon: Landmark,
-    tag: "Finance",
-    text: "How much should I set aside in cash flow before the October 2026 Vaping Products Duty hits?",
-  },
-  {
-    icon: Zap,
-    tag: "Compliance",
-    text: "What's the actual legal difference between 'refillable' and 'rechargeable' devices?",
   },
   {
     icon: PackageX,
@@ -37,6 +42,70 @@ const STARTER_PROMPTS: { icon: ComponentType<{ className?: string }>; tag: strin
     text: "My pallet arrived a case short — what's my move?",
   },
 ]
+
+/** What to show while each tool runs, so a lookup reads as progress, not a stall. */
+const TOOL_STATUS: Record<string, string> = {
+  searchCatalogue: "Searching the catalogue…",
+  myRecentOrders: "Reading your recent orders…",
+  myUsualRestock: "Checking what you're due…",
+  sellingNearMe: "Looking at what's selling near you…",
+  proposeBasket: "Putting your basket together…",
+}
+
+/** The basket Unity Assist proposes — added to the order only when the retailer taps. */
+function BasketProposal({ basket, onViewOrder }: { basket: ProposedBasket; onViewOrder: () => void }) {
+  const { addItems, openCart } = useCart()
+  const [added, setAdded] = useState(false)
+
+  if (basket.lines.length === 0) {
+    return <p className="mt-1 text-[12.5px] text-slate-500">None of those products are available right now.</p>
+  }
+
+  const cases = basket.lines.reduce((sum, l) => sum + l.quantity, 0)
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-xl border border-blue-200 bg-blue-50/60">
+      {basket.note && <p className="px-3 pt-2.5 text-[12px] font-semibold text-slate-700">{basket.note}</p>}
+      <ul className="divide-y divide-blue-100 px-3 py-1">
+        {basket.lines.map((line) => (
+          <li key={line.product.id} className="flex items-center justify-between gap-3 py-1.5 text-[12.5px]">
+            <span className="min-w-0 truncate text-slate-800">{line.product.name}</span>
+            <span className="shrink-0 font-mono font-bold text-slate-900">× {line.quantity}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center justify-between gap-2 border-t border-blue-100 bg-white px-3 py-2.5">
+        <span className="font-mono text-[13px] font-bold text-slate-900">
+          £{basket.totalExVat.toFixed(2)} <span className="font-sans text-[10px] font-semibold text-slate-400">ex VAT</span>
+        </span>
+        {added ? (
+          <button
+            type="button"
+            onClick={() => {
+              onViewOrder()
+              openCart()
+            }}
+            className="unity-tap rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-white"
+          >
+            Added · view order
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              addItems(basket.lines.map((l) => ({ product: l.product as unknown as Product, quantity: l.quantity })))
+              triggerCartAddedFeedback()
+              setAdded(true)
+            }}
+            className="unity-tap rounded-lg bg-blue-600 px-3 py-2 text-[11px] font-black uppercase tracking-wide text-white"
+          >
+            Add {cases} {cases === 1 ? "case" : "cases"} to order
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -52,17 +121,47 @@ function WhatsAppIcon({ className }: { className?: string }) {
 function AssistMark({ className }: { className?: string }) {
   return (
     <span className={`relative flex items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 ${className ?? ""}`}>
-      <span className="absolute inset-0 -z-10 animate-pulse rounded-xl bg-blue-400/40 blur-md" />
       <MessageCircle className="h-5 w-5 text-white" />
     </span>
   )
 }
 
 export function UnityAssistWidget() {
+  const hideForScroll = useHideWhileScrollingDown()
   const [open, setOpen] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [input, setInput] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Speak an order instead of typing it — where the browser supports speech recognition.
+  const [speechSupported, setSpeechSupported] = useState(false)
+  const [listening, setListening] = useState(false)
+  const recognitionRef = useRef<{ stop: () => void } | null>(null)
+
+  useEffect(() => {
+    setSpeechSupported("SpeechRecognition" in window || "webkitSpeechRecognition" in window)
+  }, [])
+
+  const toggleListening = () => {
+    if (listening) {
+      recognitionRef.current?.stop()
+      return
+    }
+    const w = window as unknown as Record<string, new () => any>
+    const Recognition = w.SpeechRecognition ?? w.webkitSpeechRecognition
+    if (!Recognition) return
+    const recognition = new Recognition()
+    recognition.lang = "en-GB"
+    recognition.interimResults = true
+    recognition.continuous = false
+    recognition.onresult = (event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
+      setInput(Array.from(event.results, (r) => r[0].transcript).join(" "))
+    }
+    recognition.onend = () => setListening(false)
+    recognition.onerror = () => setListening(false)
+    recognitionRef.current = recognition
+    setListening(true)
+    recognition.start()
+  }
 
   const { messages, sendMessage, status, stop, setMessages } = useChat({
     transport: new DefaultChatTransport({ api: "/api/assist/chat" }),
@@ -98,9 +197,10 @@ export function UnityAssistWidget() {
               type="button"
               onClick={() => setOpen(true)}
               aria-label="Open Unity Assist"
-              className="unity-tap pointer-events-auto absolute bottom-[92px] right-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-600/30 transition-transform active:scale-95"
+              className={`unity-tap pointer-events-auto absolute bottom-[92px] right-4 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-600/30 transition-[transform,opacity] duration-300 ease-out [html[data-floating-bar]_&]:bottom-[152px] ${
+                hideForScroll ? "pointer-events-none translate-y-6 opacity-0" : ""
+              }`}
             >
-              <span className="absolute inset-0 -z-10 animate-pulse rounded-full bg-blue-500/40 blur-md" />
               <MessageCircle className="h-6 w-6" />
             </button>
           </div>
@@ -167,7 +267,7 @@ export function UnityAssistWidget() {
               </div>
               {!hasMessages && (
                 <p className="relative mt-3 max-w-[92%] text-[12.5px] leading-relaxed text-blue-50/90">
-                  Compliance, margins, logistics, or something completely different — ask away.
+                  Say what you need — &ldquo;my usual, plus 5 BM600 blue razz&rdquo; — and I&rsquo;ll build the basket. Or ask about compliance, margins, logistics.
                 </p>
               )}
             </div>
@@ -216,9 +316,31 @@ export function UnityAssistWidget() {
                           : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
                       }`}
                     >
-                      {message.parts.map((part, i) =>
-                        part.type === "text" ? <span key={i} className="whitespace-pre-wrap">{part.text}</span> : null
-                      )}
+                      {message.parts.map((part, i) => {
+                        if (part.type === "text") {
+                          return <span key={i} className="whitespace-pre-wrap">{part.text}</span>
+                        }
+                        if (!isToolUIPart(part)) return null
+                        const tool = getToolName(part)
+                        if (tool === "proposeBasket" && part.state === "output-available") {
+                          return <BasketProposal key={i} basket={part.output as ProposedBasket} onViewOrder={close} />
+                        }
+                        if (part.state === "input-streaming" || part.state === "input-available") {
+                          return (
+                            <span key={i} className="block text-[12px] font-semibold text-blue-600">
+                              {TOOL_STATUS[tool] ?? "Working on it…"}
+                            </span>
+                          )
+                        }
+                        if (part.state === "output-error") {
+                          return (
+                            <span key={i} className="block text-[12px] text-red-600">
+                              That lookup didn&apos;t work — try again.
+                            </span>
+                          )
+                        }
+                        return null
+                      })}
                     </div>
                   </div>
                 ))
@@ -226,10 +348,7 @@ export function UnityAssistWidget() {
               {status === "submitted" && (
                 <div className="flex animate-in fade-in justify-start">
                   <div className="flex items-center gap-2.5 rounded-2xl rounded-bl-md border border-slate-200 bg-white px-4 py-3">
-                    <span className="relative flex h-2.5 w-2.5 shrink-0">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500" />
-                    </span>
+                    <span className="inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500" />
                     <span className="text-[11px] font-semibold text-slate-400">Thinking…</span>
                   </div>
                 </div>
@@ -250,10 +369,23 @@ export function UnityAssistWidget() {
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask Unity Assist…"
+                  placeholder={listening ? "Listening…" : "Ask or say what you need…"}
                   disabled={busy}
                   className="w-full bg-transparent text-[13.5px] outline-none placeholder:text-slate-400 disabled:opacity-60"
                 />
+                {speechSupported && !busy && (
+                  <button
+                    type="button"
+                    onClick={toggleListening}
+                    aria-label={listening ? "Stop listening" : "Speak your message"}
+                    aria-pressed={listening}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+                      listening ? "bg-red-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <Mic className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 {busy ? (
                   <button
                     type="button"

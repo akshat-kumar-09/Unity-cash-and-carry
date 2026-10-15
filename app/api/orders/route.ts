@@ -4,7 +4,9 @@ import { createOrderSchema } from "@/lib/validations"
 import { auth } from "@/auth"
 import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
 import { resolveProductPrice, isPriceTier, type PriceTier } from "@/lib/pricing"
-import { VPD_EFFECTIVE_DATE } from "@/lib/unity-business"
+import { UNITY_BUSINESS, VPD_EFFECTIVE_DATE } from "@/lib/unity-business"
+import { defaultPaymentMethod, generateCollectionCode, generatePaymentReference } from "@/lib/payment"
+import { sendOrderEmail } from "@/lib/order-emails"
 
 export async function GET(request: NextRequest) {
   try {
@@ -183,10 +185,15 @@ export async function POST(request: NextRequest) {
     const vatOnDuty = Math.round(vapeDutyAmount * 0.2 * 100) / 100
     let total = Math.max(0, Math.round((subtotal - discountAmount + vapeDutyAmount + vat) * 100) / 100)
 
-    // Deduct wallet credits
+    const isCollect = parsed.data.fulfillmentMethod === "click_and_collect"
+    const paymentMethod = parsed.data.paymentMethod ?? defaultPaymentMethod(parsed.data.fulfillmentMethod)
+
+    // Deduct wallet credits. The balance is a float column that picks up binary residue
+    // from repeated decrements (3.7199999…), so work from the balance in whole pennies.
+    const walletBalance = Math.round(user.walletBalance * 100) / 100
     let walletCreditsUsed = 0
-    if (parsed.data.useWalletCredits && user.walletBalance > 0) {
-      walletCreditsUsed = Math.min(user.walletBalance, total)
+    if (parsed.data.useWalletCredits && walletBalance > 0) {
+      walletCreditsUsed = Math.min(walletBalance, total)
       walletCreditsUsed = Math.round(walletCreditsUsed * 100) / 100
       total = Math.round((total - walletCreditsUsed) * 100) / 100
     }
@@ -197,10 +204,16 @@ export async function POST(request: NextRequest) {
     // Create order within transaction
     const order = await prisma.$transaction(async (tx) => {
       if (walletCreditsUsed > 0) {
-        await tx.user.update({
+        const updated = await tx.user.update({
           where: { id: user.id },
           data: { walletBalance: { decrement: walletCreditsUsed } },
+          select: { walletBalance: true },
         })
+        // Snap float residue back to whole pennies so the wallet never shows "£-0.00".
+        const pennies = Math.round(updated.walletBalance * 100) / 100
+        if (pennies !== updated.walletBalance) {
+          await tx.user.update({ where: { id: user.id }, data: { walletBalance: pennies } })
+        }
 
         await tx.walletTransaction.create({
           data: {
@@ -208,6 +221,24 @@ export async function POST(request: NextRequest) {
             amount: -walletCreditsUsed,
             type: "order_deduction",
             description: `Deducted for order ${orderNumber}`,
+          },
+        })
+      }
+
+      if (parsed.data.saveDetails !== undefined) {
+        const save = parsed.data.saveDetails
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            savedPhone: save ? parsed.data.customerPhone.trim() : null,
+            // Collect orders have no address — keep any saved delivery address for next time.
+            ...(save
+              ? isCollect
+                ? {}
+                : { savedAddress: parsed.data.shippingAddress?.trim() ?? null }
+              : { savedAddress: null }),
+            savedFulfillment: save ? parsed.data.fulfillmentMethod : null,
+            savedPaymentMethod: save ? paymentMethod : null,
           },
         })
       }
@@ -231,7 +262,9 @@ export async function POST(request: NextRequest) {
           discountAmount,
           walletCreditsUsed,
           paymentStatus: total <= 0 ? "paid" : "unpaid",
-          paymentMethod: total <= 0 ? "wallet" : null,
+          paymentMethod: total <= 0 ? "wallet" : paymentMethod,
+          paymentReference: total > 0 && paymentMethod === "bank_transfer" ? generatePaymentReference() : null,
+          collectionCode: isCollect ? generateCollectionCode() : null,
           paidAt: total <= 0 ? new Date() : null,
           items: {
             create: orderItems,
@@ -246,6 +279,26 @@ export async function POST(request: NextRequest) {
         },
       })
     })
+
+    // Bank transfers need the account details and reference somewhere the retailer can
+    // forward or come back to — the app shows them too, but an email outlives the screen.
+    if (order.paymentReference) {
+      void sendOrderEmail({
+        to: user.email,
+        name: user.name,
+        orderNumber: order.orderNumber,
+        subject: "Payment details for your order",
+        heading: "Order Received",
+        body: "Thanks for your order. Please pay by bank transfer using the details below, quoting the payment reference exactly so we can match it. We'll confirm your order as soon as your payment arrives.",
+        details: [
+          { label: "Amount Due", value: `£${order.total.toFixed(2)}` },
+          { label: "Account Name", value: UNITY_BUSINESS.bank.accountName },
+          { label: "Sort Code", value: UNITY_BUSINESS.bank.sortCode },
+          { label: "Account Number", value: UNITY_BUSINESS.bank.accountNumber },
+          { label: "Payment Reference", value: order.paymentReference },
+        ],
+      })
+    }
 
     return NextResponse.json(order, { status: 201 })
   } catch (error) {

@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({
-      balance: user.walletBalance,
+      // Whole pennies: the float column can hold residue like -1e-15, shown as "£-0.00".
+      balance: Math.round(user.walletBalance * 100) / 100 || 0,
       transactions,
     })
   } catch (error) {

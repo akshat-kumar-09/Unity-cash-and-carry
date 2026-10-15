@@ -1,15 +1,15 @@
 // Shopify Admin API integration (standard OAuth authorization code grant).
 // Docs: https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/authorization-code-grant
 //
-// Unlike Viva's client-credentials flow (lib/viva.ts), Shopify's authorization-code grant
-// requires a one-time merchant consent redirect (app/api/shopify/install -> Shopify's
-// consent screen -> app/api/shopify/callback) and returns a permanent access token that
-// isn't re-derivable from the client secret alone. It's persisted in SystemSetting rather
-// than env vars, since it's obtained through that flow rather than configured up front.
+// Shopify's authorization-code grant requires a one-time merchant consent redirect
+// (app/api/shopify/install -> Shopify's consent screen -> app/api/shopify/callback) and
+// returns a permanent access token that isn't re-derivable from the client secret alone.
+// It's persisted in SystemSetting rather than env vars, since it's obtained through that
+// flow rather than configured up front.
 //
-// A client_credentials token was tried first (matching Viva's pattern) but Shopify
-// returned it with zero granted scopes for this store — authorization code grant is the
-// flow documented to work reliably for any store type.
+// A client_credentials token was tried first but Shopify returned it with zero granted
+// scopes for this store — authorization code grant is the flow documented to work
+// reliably for any store type.
 
 import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
@@ -189,58 +189,6 @@ export async function createShopifyProduct(
   }
 
   return { productId, variantId: variant.id, inventoryItemId: variant.inventoryItem.id }
-}
-
-export type CreateDraftOrderParams = {
-  /** Used as a tag on the draft order so the resulting paid Order can be matched back — Shopify carries tags over when a draft order is completed. */
-  orderNumber: string
-  customerEmail: string
-  customerName: string
-  lineItems: { title: string; quantity: number; unitPrice: number }[]
-}
-
-/**
- * Creates a Shopify draft order priced from our own line items (not linked to real
- * Shopify product/variant IDs — that mapping doesn't exist yet) and returns its
- * invoiceUrl, which shows Shopify's checkout with Viva as a payment option.
- */
-export async function createDraftOrderInvoice(
-  params: CreateDraftOrderParams
-): Promise<{ draftOrderId: string; invoiceUrl: string }> {
-  const data = await shopifyGraphQL<{
-    draftOrderCreate: {
-      draftOrder: { id: string; invoiceUrl: string } | null
-      userErrors: { field: string[]; message: string }[]
-    }
-  }>(
-    `mutation CreateDraftOrder($input: DraftOrderInput!) {
-      draftOrderCreate(input: $input) {
-        draftOrder { id invoiceUrl }
-        userErrors { field message }
-      }
-    }`,
-    {
-      input: {
-        email: params.customerEmail || undefined,
-        tags: [`unity-order:${params.orderNumber}`],
-        note: `Unity Cash & Carry order ${params.orderNumber}`,
-        lineItems: params.lineItems.map((item) => ({
-          title: item.title,
-          quantity: item.quantity,
-          originalUnitPrice: item.unitPrice.toFixed(2),
-        })),
-      },
-    }
-  )
-
-  const result = data.draftOrderCreate
-  if (result.userErrors.length > 0) {
-    throw new Error(`Shopify draft order create failed: ${JSON.stringify(result.userErrors)}`)
-  }
-  if (!result.draftOrder) {
-    throw new Error("Shopify draft order create returned no draftOrder")
-  }
-  return { draftOrderId: result.draftOrder.id, invoiceUrl: result.draftOrder.invoiceUrl }
 }
 
 /** Verifies the X-Shopify-Hmac-Sha256 header Shopify signs onto every webhook delivery. */

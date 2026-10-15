@@ -24,6 +24,10 @@ import {
   ClipboardList,
 } from "lucide-react"
 import { AppScreenHeader } from "@/components/app-screen-header"
+import { PaymentInstructions } from "@/components/payment-instructions"
+import { CollectionPass } from "@/components/collection-pass"
+import { useOnTabShown } from "@/lib/tab-events"
+import { payableMethod, paymentMethodLabel } from "@/lib/payment"
 import { useCart } from "@/lib/cart-context"
 import { useBackHandler } from "@/lib/use-back-handler"
 import { toast } from "sonner"
@@ -63,6 +67,7 @@ type Order = {
   promoCode: string | null
   discountAmount: number
   walletCreditsUsed: number
+  vapeDutyAmount: number
   customerName: string | null
   customerEmail: string | null
   customerPhone: string | null
@@ -71,6 +76,12 @@ type Order = {
   notes: string | null
   createdAt: string
   paymentStatus: string
+  paymentMethod: string | null
+  paymentReference: string | null
+  paidAt: string | null
+  collectionCode: string | null
+  readyAt: string | null
+  collectedAt: string | null
   items?: OrderItem[]
 }
 
@@ -105,6 +116,14 @@ const DELIVERY_STAGES = [
   { key: "confirmed", label: "Confirmed" },
   { key: "dispatched", label: "Dispatched" },
   { key: "delivered", label: "Delivered" },
+] as const
+
+/** Click & collect's equivalent — "ready" and "collected" come from readyAt/collectedAt. */
+const COLLECTION_STAGES = [
+  { key: "pending", label: "Placed" },
+  { key: "confirmed", label: "Confirmed" },
+  { key: "ready", label: "Ready" },
+  { key: "collected", label: "Collected" },
 ] as const
 
 function StatusPill({ status }: { status: string }) {
@@ -167,25 +186,7 @@ export function OrdersView() {
   // UI States
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null)
-  const [payingOrderId, setPayingOrderId] = useState<string | null>(null)
   useBackHandler(invoiceOrder !== null, () => setInvoiceOrder(null))
-
-  const handlePayNow = async (order: Order) => {
-    setPayingOrderId(order.id)
-    try {
-      const res = await fetch("/api/payments/shopify/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: order.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to start payment")
-      window.location.href = data.checkoutUrl
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to start payment")
-      setPayingOrderId(null)
-    }
-  }
 
   const fetchOrders = async (showToast = false) => {
     try {
@@ -228,6 +229,12 @@ export function OrdersView() {
       setAnalyticsLoading(false)
     }
   }
+
+  // Coming back to Orders refreshes in place — no spinner, the list just updates.
+  useOnTabShown("orders", () => {
+    void fetchOrders()
+    void fetchAnalytics()
+  })
 
   useEffect(() => {
     fetchOrders()
@@ -287,7 +294,13 @@ export function OrdersView() {
   }
 
   const activeOrder = orders.find((o) => o.status === "pending" || o.status === "confirmed" || o.status === "dispatched")
-  const activeStageIndex = activeOrder ? DELIVERY_STAGES.findIndex((s) => s.key === activeOrder.status) : -1
+  const activeIsCollect = activeOrder?.fulfillmentMethod === "click_and_collect"
+  const stages = activeIsCollect ? COLLECTION_STAGES : DELIVERY_STAGES
+  const activeStageIndex = !activeOrder
+    ? -1
+    : activeIsCollect
+      ? activeOrder.collectedAt ? 3 : activeOrder.readyAt ? 2 : activeOrder.status === "confirmed" ? 1 : 0
+      : DELIVERY_STAGES.findIndex((s) => s.key === activeOrder.status)
 
   return (
     <div className="relative flex min-h-[100dvh] flex-col overflow-hidden pb-28 md:max-w-4xl md:mx-auto md:w-full md:shadow-xl bg-gradient-to-b from-blue-700 via-blue-800 to-blue-950">
@@ -465,23 +478,27 @@ export function OrdersView() {
                             £{order.total.toFixed(2)}
                           </p>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-mono text-[10px] font-semibold text-slate-400 truncate">
-                            #{order.orderNumber} · {formatDate(order.createdAt)}
-                          </p>
-                          <div className="flex items-center gap-1.5">
+                        <p className="font-mono text-[10px] font-semibold text-slate-400 truncate">
+                          #{order.orderNumber} · {formatDate(order.createdAt)}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                             {order.fulfillmentMethod === "click_and_collect" && (
                               <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[9.5px] font-black uppercase tracking-wider text-blue-700">
                                 <Package className="h-3 w-3" /> Collect
                               </span>
                             )}
-                            {order.paymentStatus === "unpaid" && order.total > 0 && (
-                              <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider text-red-600">
-                                Unpaid
-                              </span>
+                            {order.paymentStatus === "unpaid" && order.total > 0 && order.status !== "cancelled" && (
+                              order.fulfillmentMethod === "click_and_collect" ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider text-slate-600">
+                                  Pay at collection
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider text-red-600">
+                                  Unpaid
+                                </span>
+                              )
                             )}
                             <StatusPill status={order.status} />
-                          </div>
                         </div>
                       </div>
 
@@ -558,6 +575,12 @@ export function OrdersView() {
                                   <span className="font-mono font-bold">-£{order.discountAmount.toFixed(2)}</span>
                                 </div>
                               )}
+                              {order.vapeDutyAmount > 0 && (
+                                <div className="flex justify-between">
+                                  <span>Vaping Products Duty</span>
+                                  <span className="font-mono">£{order.vapeDutyAmount.toFixed(2)}</span>
+                                </div>
+                              )}
                               <div className="flex justify-between">
                                 <span>VAT</span>
                                 <span className="font-mono">£{order.vat.toFixed(2)}</span>
@@ -572,25 +595,40 @@ export function OrdersView() {
                                 <span>Total</span>
                                 <span className="font-mono text-blue-600">£{order.total.toFixed(2)}</span>
                               </div>
+                              {order.paymentStatus === "paid" && order.total > 0 && (
+                                <div className="flex justify-between text-emerald-600">
+                                  <span>{paymentMethodLabel(order.paymentMethod)}</span>
+                                  <span className="font-bold">Paid{order.paidAt ? ` ${formatDate(order.paidAt)}` : ""}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
 
+                        {/* Collect orders: the collection pass (paid at the counter). Delivery
+                            orders still owing: bank details and the payment reference. */}
+                        {order.status !== "cancelled" &&
+                          (payableMethod(order) === "counter" ? (
+                            order.collectionCode && (
+                              <CollectionPass
+                                code={order.collectionCode}
+                                amountDue={order.paymentStatus === "paid" ? 0 : order.total}
+                                readyAt={order.readyAt}
+                                collectedAt={order.collectedAt}
+                              />
+                            )
+                          ) : (
+                            order.paymentStatus === "unpaid" &&
+                            order.total > 0 &&
+                            order.paymentReference && (
+                              <div className="rounded-2xl border border-slate-150 bg-white p-3.5">
+                                <PaymentInstructions amount={order.total} reference={order.paymentReference} />
+                              </div>
+                            )
+                          ))}
+
                         {/* Actions */}
                         <div className="flex flex-col gap-2 pt-1 sm:flex-row">
-                          {order.paymentStatus === "unpaid" && order.total > 0 && (
-                            <button
-                              onClick={() => handlePayNow(order)}
-                              disabled={payingOrderId === order.id}
-                              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition-all hover:bg-red-700 active:scale-[0.98] disabled:opacity-50"
-                            >
-                              {payingOrderId === order.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <>Pay £{order.total.toFixed(2)} Now</>
-                              )}
-                            </button>
-                          )}
                           <button
                             onClick={() => handleQuickReorder(order)}
                             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.98]"
@@ -650,7 +688,7 @@ export function OrdersView() {
         {/* ================= 4. Delivery Status ================= */}
         {!loading && !error && orders.length > 0 && (
           <section className="space-y-2.5">
-            <SectionHeader icon={Truck} title="Delivery Status" subtitle={activeOrder ? `Order #${activeOrder.orderNumber}` : "Nothing in flight right now"} />
+            <SectionHeader icon={Truck} title={activeIsCollect ? "Collection Status" : "Delivery Status"} subtitle={activeOrder ? `Order #${activeOrder.orderNumber}` : "Nothing in flight right now"} />
             <div className="rounded-2xl border border-slate-150 bg-white p-4 shadow-sm">
               {!activeOrder ? (
                 <div className="flex flex-col items-center gap-2 py-6 text-center">
@@ -663,7 +701,7 @@ export function OrdersView() {
               ) : (
                 <>
                   <div className="flex items-center">
-                    {DELIVERY_STAGES.map((stage, i) => {
+                    {stages.map((stage, i) => {
                       const isDone = i < activeStageIndex
                       const isCurrent = i === activeStageIndex
                       return (
@@ -671,7 +709,7 @@ export function OrdersView() {
                           <div className="flex flex-col items-center gap-1.5">
                             <span className="relative flex h-7 w-7 items-center justify-center rounded-full">
                               {isCurrent && (
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
+                                <span className="absolute -inset-1 rounded-full ring-2 ring-blue-200" />
                               )}
                               <span
                                 className={`relative flex h-7 w-7 items-center justify-center rounded-full ${
@@ -685,7 +723,7 @@ export function OrdersView() {
                               {stage.label}
                             </span>
                           </div>
-                          {i < DELIVERY_STAGES.length - 1 && (
+                          {i < stages.length - 1 && (
                             <div className={`mx-1.5 h-0.5 flex-1 rounded-full ${i < activeStageIndex ? "bg-blue-500" : "bg-slate-150"}`} />
                           )}
                         </div>
@@ -695,9 +733,19 @@ export function OrdersView() {
                   <div className="mt-4 flex items-start gap-2 rounded-xl bg-blue-50/70 border border-blue-100 p-3">
                     <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
                     <p className="text-[11.5px] leading-relaxed text-blue-800">
-                      {activeOrder.status === "pending" && "Awaiting confirmation from the Glasgow depot."}
-                      {activeOrder.status === "confirmed" && "Confirmed — orders placed by 2:00 PM dispatch next working day."}
-                      {activeOrder.status === "dispatched" && "On the road. Damaged or missing items? Report within 48 hours via the handoff below."}
+                      {activeIsCollect ? (
+                        <>
+                          {activeStageIndex === 0 && "Awaiting confirmation from the Glasgow depot."}
+                          {activeStageIndex === 1 && "Confirmed — we'll text you the moment it's ready to collect."}
+                          {activeStageIndex === 2 && "Ready at the depot — show your collection pass at the counter."}
+                        </>
+                      ) : (
+                        <>
+                          {activeOrder.status === "pending" && "Awaiting confirmation from the Glasgow depot."}
+                          {activeOrder.status === "confirmed" && "Confirmed — orders placed by 2:00 PM dispatch next working day."}
+                          {activeOrder.status === "dispatched" && "On the road. Damaged or missing items? Report within 48 hours via the handoff below."}
+                        </>
+                      )}
                     </p>
                   </div>
                 </>
@@ -761,7 +809,7 @@ export function OrdersView() {
                   <h2 className="text-xl font-bold text-slate-900 uppercase">INVOICE</h2>
                   <p className="font-mono font-bold text-slate-700">#{invoiceOrder.orderNumber}</p>
                   <p className="text-xs text-slate-500">Date: {formatDate(invoiceOrder.createdAt)}</p>
-                  <p className="text-xs text-slate-500">Payment Status: <span className="font-bold text-slate-700 uppercase">{invoiceOrder.status}</span></p>
+                  <p className="text-xs text-slate-500">Payment Status: <span className="font-bold text-slate-700 uppercase">{invoiceOrder.paymentStatus}</span></p>
                 </div>
               </div>
 
@@ -815,6 +863,9 @@ export function OrdersView() {
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Payment Details</span>
                   <p className="font-semibold text-slate-700">Bank Account Name: {UNITY_BUSINESS.bank.accountName}</p>
                   <p>Sort Code: {UNITY_BUSINESS.bank.sortCode} · Account Number: {UNITY_BUSINESS.bank.accountNumber}</p>
+                  {invoiceOrder.paymentReference && (
+                    <p>Payment Reference: <span className="font-mono font-semibold text-slate-700">{invoiceOrder.paymentReference}</span></p>
+                  )}
                 </div>
                 <div className="w-64 space-y-2 text-xs font-semibold text-slate-500 shrink-0">
                   <div className="flex justify-between">
@@ -825,6 +876,12 @@ export function OrdersView() {
                     <div className="flex justify-between text-emerald-600">
                       <span>Promo Discount ({invoiceOrder.promoCode})</span>
                       <span className="font-mono font-bold">-£{invoiceOrder.discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {invoiceOrder.vapeDutyAmount > 0 && (
+                    <div className="flex justify-between">
+                      <span>Vaping Products Duty</span>
+                      <span className="font-mono">£{invoiceOrder.vapeDutyAmount.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
@@ -838,7 +895,7 @@ export function OrdersView() {
                     </div>
                   )}
                   <div className="flex justify-between pt-2 border-t border-slate-100 text-slate-900 font-bold">
-                    <span>Total Paid</span>
+                    <span>{invoiceOrder.paymentStatus === "paid" ? "Total Paid" : "Total Due"}</span>
                     <span className="font-mono text-sm text-blue-700">£{invoiceOrder.total.toFixed(2)}</span>
                   </div>
                 </div>

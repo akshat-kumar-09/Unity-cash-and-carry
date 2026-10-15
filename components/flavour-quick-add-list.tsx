@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Check, ShoppingCart, Mail, Pencil, Trash2 } from "lucide-react"
+import { Mail, Pencil, Trash2 } from "lucide-react"
 import {
   matchesBrandFilter,
   getEffectiveMaxQtyPerOrder,
@@ -9,13 +9,12 @@ import {
   type Product,
 } from "@/lib/products"
 import type { ProductCategorySlug } from "@/lib/product-categories"
-import { useCart } from "@/lib/cart-context"
-import { triggerCartAddedFeedback } from "@/lib/cart-feedback"
+import { invalidateProducts, useProducts } from "@/lib/product-store"
+import { useShopStaging } from "@/lib/shop-staging"
 import { ProductDetailModal } from "@/components/product-detail-modal"
 import { NotifyMeModal } from "@/components/notify-me-modal"
 import { EditProductModal } from "@/components/edit-product-modal"
 
-const FETCH_LIMIT = 100
 const HOLD_DELAY_MS = 420
 const HOLD_INTERVAL_MS = 90
 const INITIAL_VISIBLE = 24
@@ -238,7 +237,9 @@ type FlavourQuickAddListProps = {
 }
 
 /** Rendered inline inside the shop accordion — the innermost expanded level (brand,
- *  or brand → line) drops straight into this rather than navigating to a new screen. */
+ *  or brand → line) drops straight into this rather than navigating to a new screen.
+ *  Products come from the shared catalogue cache (the same request the line list used),
+ *  and +/− picks go into the shop-wide staging so they survive this list closing. */
 export function FlavourQuickAddList({
   categorySlug,
   brand,
@@ -247,55 +248,14 @@ export function FlavourQuickAddList({
   isAdmin = false,
   onProductUpdated,
 }: FlavourQuickAddListProps) {
-  const { addItems } = useCart()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [staged, setStaged] = useState<Record<string, number>>({})
+  const { products: cached, failed, retry } = useProducts({ category: categorySlug, brand })
+  const { qtyOf, setQty } = useShopStaging()
   const [detailProduct, setDetailProduct] = useState<Product | null>(null)
   const [notifyProduct, setNotifyProduct] = useState<Product | null>(null)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [justAdded, setJustAdded] = useState(false)
-  const [refreshTick, setRefreshTick] = useState(0)
   // Caps how many rows (and images) mount at once — a line with hundreds of flavours
   // shouldn't force the browser to paint/decode all of them the instant it expands.
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const params = new URLSearchParams()
-        params.set("category", categorySlug)
-        params.set("brand", brand)
-        if (productLine) params.set("productLine", productLine)
-        params.set("limit", String(FETCH_LIMIT))
-        const res = await fetch(`/api/products?${params.toString()}`)
-        const data = await res.json()
-        if (cancelled) return
-        if (!res.ok || !Array.isArray(data?.products)) throw new Error("Failed to load")
-        setProducts(data.products)
-      } catch {
-        if (!cancelled) {
-          setProducts([])
-          setError("Could not load flavours. Pull down to try again.")
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [categorySlug, brand, productLine, refreshTick])
-
-  // Reset staged quantities and the visible-row cap whenever the leaf changes so
-  // state from one flavour list never leaks into another after navigating.
-  useEffect(() => {
-    setStaged({})
-    setVisibleCount(INITIAL_VISIBLE)
-  }, [categorySlug, brand, productLine])
 
   // A new search term can reveal a match beyond the current cap — don't make the
   // user hit "show more" just to see a result they explicitly searched for.
@@ -305,7 +265,7 @@ export function FlavourQuickAddList({
 
   const flavours = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return products
+    return (cached ?? [])
       .filter((p) => matchesBrandFilter(p, brand))
       .filter((p) => (productLine ? p.productLine === productLine : true))
       .filter((p) => {
@@ -317,33 +277,7 @@ export function FlavourQuickAddList({
         )
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [products, brand, productLine, search])
-
-  const setQty = useCallback((product: Product, updater: (prev: number) => number) => {
-    const max = getEffectiveMaxQtyPerOrder(product)
-    setStaged((prev) => {
-      const current = prev[product.id] ?? 0
-      const next = Math.max(0, Math.min(max, updater(current)))
-      if (next === current) return prev
-      if (next === 0) {
-        const { [product.id]: _drop, ...rest } = prev
-        return rest
-      }
-      return { ...prev, [product.id]: next }
-    })
-  }, [])
-
-  const totalStaged = useMemo(
-    () => Object.values(staged).reduce((sum, n) => sum + n, 0),
-    [staged]
-  )
-  const totalPrice = useMemo(() => {
-    const byId = new Map(products.map((p) => [p.id, p]))
-    return Object.entries(staged).reduce((sum, [id, qty]) => {
-      const p = byId.get(id)
-      return p ? sum + p.casePrice * qty : sum
-    }, 0)
-  }, [staged, products])
+  }, [cached, brand, productLine, search])
 
   const handleAdminDelete = async (product: Product) => {
     if (!isAdmin) return
@@ -355,45 +289,42 @@ export function FlavourQuickAddList({
         alert(data.error || "Could not remove product.")
         return
       }
-      setProducts((prev) => prev.filter((p) => p.id !== product.id))
+      invalidateProducts()
       onProductUpdated?.()
     } catch {
       alert("Could not remove product.")
     }
   }
 
-  const handleBatchAdd = () => {
-    if (totalStaged === 0) return
-    const byId = new Map(products.map((p) => [p.id, p]))
-    const itemsToAdd = Object.entries(staged)
-      .map(([id, quantity]) => ({ product: byId.get(id), quantity }))
-      .filter((x): x is { product: Product; quantity: number } => !!x.product && x.quantity > 0)
-    if (itemsToAdd.length === 0) return
-    addItems(itemsToAdd)
-    setStaged({})
-    triggerCartAddedFeedback()
-    setJustAdded(true)
-    setTimeout(() => setJustAdded(false), 1100)
-  }
+  const loading = cached === null && !failed
 
   return (
-    <div className={totalStaged > 0 || justAdded ? "pb-16" : ""}>
+    <div>
       {loading && (
-        <div className="px-3 py-8 text-center">
-          <div className="inline-flex flex-col items-center gap-2">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-100 border-t-blue-500" />
-            <p className="text-[11px] font-bold uppercase tracking-wider text-blue-500/80">Loading…</p>
-          </div>
+        <div className="overflow-hidden rounded-xl border border-dashed border-blue-200/70 bg-white/70" aria-busy="true" aria-label="Loading flavours">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-2 border-b border-blue-100/90 px-2 py-2.5 last:border-b-0">
+              <div className="h-8 w-8 shrink-0 rounded-md bg-slate-100" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-2.5 w-2/3 rounded bg-slate-100" />
+                <div className="h-2 w-1/3 rounded bg-slate-100" />
+              </div>
+              <div className="h-9 w-[116px] shrink-0 rounded-xl bg-slate-100" />
+            </div>
+          ))}
         </div>
       )}
 
-      {!loading && error && (
+      {failed && (
         <div className="mx-1 my-1 rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2.5 text-center">
-          <p className="text-[12px] font-medium leading-snug text-amber-950/90">{error}</p>
+          <p className="text-[12px] font-medium leading-snug text-amber-950/90">Could not load flavours.</p>
+          <button type="button" onClick={retry} className="mt-1 text-[11px] font-bold uppercase tracking-wider text-blue-700">
+            Try again
+          </button>
         </div>
       )}
 
-      {!loading && !error && flavours.length === 0 && (
+      {!loading && !failed && flavours.length === 0 && (
         <div className="mx-1 my-1 rounded-xl border border-dashed border-blue-200/70 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes py-8 text-center shadow-inner">
           <p className="text-[13px] font-semibold text-slate-800">No flavours found</p>
           <p className="unity-meta mx-auto mt-1 max-w-[240px] text-[11px]">
@@ -402,14 +333,14 @@ export function FlavourQuickAddList({
         </div>
       )}
 
-      {!loading && !error && flavours.length > 0 && (
+      {!loading && !failed && flavours.length > 0 && (
         <>
           <div className="overflow-hidden rounded-xl border border-dashed border-blue-200/70 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner">
             {flavours.slice(0, visibleCount).map((product) => (
               <FlavourRow
                 key={product.id}
                 product={product}
-                qty={staged[product.id] ?? 0}
+                qty={qtyOf(product.id)}
                 maxQty={getEffectiveMaxQtyPerOrder(product)}
                 onIncrement={() => setQty(product, (q) => q + 1)}
                 onDecrement={() => setQty(product, (q) => q - 1)}
@@ -434,30 +365,6 @@ export function FlavourQuickAddList({
         </>
       )}
 
-      {(totalStaged > 0 || justAdded) && (
-        <div className="pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-[35] flex justify-center px-3">
-          <button
-            type="button"
-            onClick={handleBatchAdd}
-            className={`pointer-events-auto unity-tap flex w-full max-w-md items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-blue-900/20 transition-colors ${
-              justAdded ? "bg-emerald-600" : "bg-blue-600 hover:bg-blue-700"
-            }`}
-          >
-            {justAdded ? (
-              <>
-                <Check className="h-5 w-5" strokeWidth={3} />
-                Added
-              </>
-            ) : (
-              <>
-                <ShoppingCart className="h-4 w-4" />
-                Add {totalStaged} {totalStaged === 1 ? "item" : "items"} — £{totalPrice.toFixed(2)}
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
       {detailProduct && (
         <ProductDetailModal
           product={detailProduct}
@@ -480,7 +387,7 @@ export function FlavourQuickAddList({
           onClose={() => setEditingProduct(null)}
           onSuccess={() => {
             setEditingProduct(null)
-            setRefreshTick((t) => t + 1)
+            invalidateProducts()
             onProductUpdated?.()
           }}
         />

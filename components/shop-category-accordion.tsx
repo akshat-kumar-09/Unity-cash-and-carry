@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   Sparkles,
 } from "lucide-react"
 import {
@@ -17,6 +16,9 @@ import {
 import { BrandLinePicker } from "@/components/brand-line-picker"
 import { FlavourQuickAddList } from "@/components/flavour-quick-add-list"
 import { BrandMark } from "@/components/brand-mark"
+import { Expand } from "@/components/expand"
+import { prefetchProducts, useProducts } from "@/lib/product-store"
+import { anchorScroll } from "@/lib/anchor-scroll"
 
 /** Only simple-browse categories (papers/filters/lighters/other) still leave the
  *  accordion — everything brand-driven (vapes/e-liquids/pouches) now expands inline. */
@@ -35,15 +37,20 @@ function BrandRow({
   brand,
   expanded,
   onSelect,
+  onIntent,
 }: {
   brand: string
   expanded: boolean
-  onSelect: () => void
+  onSelect: (row: HTMLElement) => void
+  /** Finger down / pointer over — start loading before the tap completes. */
+  onIntent: () => void
 }) {
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={(e) => onSelect(e.currentTarget)}
+      onPointerDown={onIntent}
+      onPointerEnter={onIntent}
       aria-expanded={expanded}
       className={`unity-tap group flex w-full items-center gap-3 border-b border-blue-100 px-3 py-3 text-left transition hover:bg-blue-50/60 active:bg-blue-50 ${
         expanded
@@ -55,13 +62,40 @@ function BrandRow({
       <span className="min-w-0 flex-1 text-[15px] font-bold tracking-tight text-blue-700 group-hover:text-blue-800">
         {brand}
       </span>
-      {expanded ? (
-        <ChevronUp className="h-4 w-4 shrink-0 text-blue-500" />
-      ) : (
-        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-blue-400 transition group-hover:translate-x-0.5 group-hover:text-blue-600" />
-      )}
+      <ChevronRight
+        className={`h-4 w-4 shrink-0 text-blue-400 transition-transform duration-200 ${expanded ? "rotate-90 text-blue-500" : ""}`}
+      />
     </button>
   )
+}
+
+/** Quietly loads each brand of an open category in the background, one at a time while
+ *  the phone is idle, so the first tap on any brand opens instantly. Skipped on Data
+ *  Saver or a slow connection, where it would cost the retailer more than it saves. */
+function usePrefetchBrands(category: string, brands: readonly string[], enabled: boolean) {
+  useEffect(() => {
+    if (!enabled || brands.length === 0) return
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection
+    if (connection?.saveData || /(^|-)2g$|^3g$/.test(connection?.effectiveType ?? "")) return
+
+    let cancelled = false
+    let index = 0
+    const idle = (fn: () => void) => {
+      if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(fn, { timeout: 2000 })
+      else setTimeout(fn, 300)
+    }
+    const next = () => {
+      if (cancelled || index >= brands.length) return
+      const brand = brands[index++]
+      prefetchProducts({ category, brand })
+      idle(next)
+    }
+    const start = window.setTimeout(() => idle(next), 1200)
+    return () => {
+      cancelled = true
+      window.clearTimeout(start)
+    }
+  }, [category, brands, enabled])
 }
 
 /** Category card that expands to a flat brand list; tapping a brand expands it
@@ -74,37 +108,12 @@ function BrandRow({
  *  line picker uses for product lines, so a new brand shows up automatically the
  *  moment admin adds stock under it, with no taxonomy file to keep in sync. */
 function useDynamicBrands(categorySlug: string, enabled: boolean) {
-  const [brands, setBrands] = useState<string[] | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (!enabled || brands !== null) return
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        params.set("category", categorySlug)
-        params.set("limit", "100")
-        const res = await fetch(`/api/products?${params.toString()}`)
-        const data = await res.json()
-        if (cancelled) return
-        const set = new Set<string>()
-        for (const p of Array.isArray(data?.products) ? data.products : []) {
-          if (p?.brand) set.add(p.brand)
-        }
-        setBrands([...set].sort())
-      } catch {
-        if (!cancelled) setBrands([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [categorySlug, enabled, brands])
-
-  return { brands: brands ?? [], loading }
+  const { products, failed } = useProducts(enabled ? { category: categorySlug } : null)
+  const brands = useMemo(
+    () => [...new Set((products ?? []).map((p) => p.brand).filter(Boolean))].sort(),
+    [products]
+  )
+  return { brands, loading: enabled && products === null && !failed }
 }
 
 function BrandDrilldownCard({
@@ -132,12 +141,13 @@ function BrandDrilldownCard({
     !staticBrands && expanded
   )
   const brands = staticBrands ?? dynamicBrands
+  usePrefetchBrands(def.id, brands, expanded)
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-dashed border-blue-300/80 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner">
       <button
         type="button"
-        onClick={() => setExpanded((e) => !e)}
+        onClick={(e) => anchorScroll(e.currentTarget, () => setExpanded((open) => !open))}
         className="unity-tap flex w-full items-center justify-between px-3.5 py-3 text-left"
         aria-expanded={expanded}
       >
@@ -149,23 +159,21 @@ function BrandDrilldownCard({
             {def.keywords}
           </p>
         </div>
-        {expanded ? (
-          <ChevronUp className="h-4 w-4 shrink-0 text-blue-500" />
-        ) : (
-          <ChevronDown className="h-4 w-4 shrink-0 text-blue-500" />
-        )}
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-blue-500 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+        />
       </button>
       {expanded && (
+        <Expand>
         <div className="border-t border-dashed border-blue-200/80 px-2.5 pb-2.5 pt-2">
           <div className="overflow-hidden rounded-2xl border border-blue-200/70 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner">
-            {loadingBrands && brands.length === 0 && (
-              <div className="px-3 py-3 text-center">
-                <div className="inline-flex items-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-200 border-t-blue-500" />
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-blue-500/80">Loading brands…</p>
+            {loadingBrands && brands.length === 0 &&
+              [0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-3 border-b border-blue-100 px-3 py-3" aria-hidden>
+                  <div className="h-9 w-14 rounded-lg bg-slate-100" />
+                  <div className="h-3 w-24 rounded bg-slate-100" />
                 </div>
-              </div>
-            )}
+              ))}
             {!loadingBrands && brands.length === 0 && (
               <p className="px-3 py-3 text-center text-[11px] font-semibold text-slate-400">
                 No brands live yet in this section.
@@ -178,10 +186,12 @@ function BrandDrilldownCard({
                   <BrandRow
                     brand={brand}
                     expanded={isOpen}
-                    onSelect={() => setOpenBrand(isOpen ? null : brand)}
+                    onSelect={(row) => anchorScroll(row, () => setOpenBrand(isOpen ? null : brand))}
+                    onIntent={() => prefetchProducts({ category: def.id, brand })}
                   />
                   {isOpen && (
-                    mode === "brand_only" ? (
+                    <Expand>
+                    {mode === "brand_only" ? (
                       <div className="border-t border-dashed border-blue-100/90 p-1.5">
                         <FlavourQuickAddList
                           categorySlug={def.id}
@@ -199,13 +209,15 @@ function BrandDrilldownCard({
                         isAdmin={isAdmin}
                         onProductUpdated={onProductUpdated}
                       />
-                    )
+                    )}
+                    </Expand>
                   )}
                 </div>
               )
             })}
           </div>
         </div>
+        </Expand>
       )}
     </div>
   )
@@ -241,48 +253,36 @@ function SimpleCategoryTile({
   )
 }
 
-function ComingSoonTile({
-  label,
-  keywords,
-}: {
-  label: string
-  keywords: string
-}) {
+/** Every not-yet-live category in one compact block at the end — previously each had its
+ *  own full-size tile, which put 17 "Soon" cards between Vaping and Papers/Filters. */
+function ComingSoonGroup({ categories }: { categories: { id: string; label: string }[] }) {
+  if (categories.length === 0) return null
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-dashed border-slate-300/90 bg-gradient-to-br from-slate-100/90 via-white to-slate-50/80 px-4 py-3.5 shadow-inner">
-      <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-blue-500/5 blur-2xl" />
-      <div className="relative flex items-start justify-between gap-3">
-        <div>
-          <span className="text-[12px] font-bold uppercase tracking-wider text-slate-600">
-            {label}
+    <div className="rounded-2xl border border-dashed border-slate-300/90 bg-gradient-to-br from-slate-100/90 via-white to-slate-50/80 px-4 py-3.5 shadow-inner">
+      <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+        <Sparkles className="h-3.5 w-3.5" /> Coming soon
+      </p>
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        {categories.map((cat) => (
+          <span
+            key={cat.id}
+            className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500"
+          >
+            {cat.label}
           </span>
-          <p className="mt-1 max-w-[220px] text-[10px] font-medium leading-snug text-slate-400">
-            {keywords}
-          </p>
-        </div>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-200/80 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">
-          <Sparkles className="h-3 w-3" />
-          Soon
-        </span>
+        ))}
       </div>
     </div>
   )
 }
 
 export function ShopCategoryAccordion({ onNavigate, search, isAdmin = false, onProductUpdated }: ShopCategoryAccordionProps) {
+  const live = SHOP_CATEGORIES.filter((cat) => cat.status !== "coming_soon")
+  const comingSoon = SHOP_CATEGORIES.filter((cat) => cat.status === "coming_soon")
+
   return (
     <div className="space-y-3 px-3 pb-28 pt-2">
-      {SHOP_CATEGORIES.map((cat) => {
-        if (cat.status === "coming_soon") {
-          return (
-            <ComingSoonTile
-              key={cat.id}
-              label={cat.label}
-              keywords={cat.keywords}
-            />
-          )
-        }
-
+      {live.map((cat) => {
         if (cat.drilldown === "brand_then_line") {
           return (
             <BrandDrilldownCard
@@ -321,6 +321,7 @@ export function ShopCategoryAccordion({ onNavigate, search, isAdmin = false, onP
           />
         )
       })}
+      <ComingSoonGroup categories={comingSoon} />
     </div>
   )
 }

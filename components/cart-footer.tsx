@@ -1,28 +1,76 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Package, Truck, Store, X, Trash2, CheckCircle, Minus, Plus, ArrowLeft, TrendingUp } from "lucide-react"
+import { Package, Truck, Store, X, Trash2, CheckCircle, Minus, Plus, ArrowLeft, TrendingUp, Landmark, Banknote, CreditCard } from "lucide-react"
 import { useCart } from "@/lib/cart-context"
 import { useSession } from "next-auth/react"
 import { getEffectiveMaxQtyPerOrder } from "@/lib/products"
 import { useBackHandler } from "@/lib/use-back-handler"
 import { usePulseOnCartAdded } from "@/lib/cart-feedback"
 import { UNITY_BUSINESS, VPD_EFFECTIVE_DATE } from "@/lib/unity-business"
+import { defaultPaymentMethod, isPaymentMethodAllowed, payableMethod, type PaymentMethod } from "@/lib/payment"
+import { PaymentInstructions } from "@/components/payment-instructions"
+import { CollectionPass } from "@/components/collection-pass"
+import { useShopStaging } from "@/lib/shop-staging"
+import { useFloatingBarPresence } from "@/lib/floating-ui"
 
 type FulfillmentMethod = "delivery" | "click_and_collect"
 
 type CheckoutFormData = {
   fulfillmentMethod: FulfillmentMethod
+  /** Delivery is paid by bank transfer; click & collect by cash or card at the counter. */
+  paymentMethod: PaymentMethod
   customerPhone: string
   shippingAddress: string
   notes: string
+  rememberDetails: boolean
+}
+
+/** What /api/account/checkout-details returns — details remembered from a past checkout. */
+type SavedCheckoutDetails = {
+  phone: string | null
+  address: string | null
+  fulfillmentMethod: string | null
+  paymentMethod: string | null
 }
 
 const initialForm: CheckoutFormData = {
   fulfillmentMethod: "delivery",
+  paymentMethod: "bank_transfer",
   customerPhone: "",
   shippingAddress: "",
   notes: "",
+  rememberDetails: true,
+}
+
+/** The form a returning retailer starts from: their remembered details, else blank. */
+function prefilledForm(saved: SavedCheckoutDetails | null): CheckoutFormData {
+  if (!saved) return initialForm
+  const fulfillmentMethod: FulfillmentMethod =
+    saved.fulfillmentMethod === "click_and_collect" ? "click_and_collect" : "delivery"
+  const paymentMethod =
+    saved.paymentMethod && isPaymentMethodAllowed(saved.paymentMethod, fulfillmentMethod)
+      ? (saved.paymentMethod as PaymentMethod)
+      : defaultPaymentMethod(fulfillmentMethod)
+  return {
+    ...initialForm,
+    fulfillmentMethod,
+    paymentMethod,
+    customerPhone: saved.phone ?? "",
+    shippingAddress: saved.address ?? "",
+  }
+}
+
+/** The parts of a just-placed order the confirmation screen needs. */
+type PlacedOrder = {
+  orderNumber: string
+  total: number
+  paymentStatus: string
+  paymentMethod: string | null
+  paymentReference: string | null
+  fulfillmentMethod: string
+  customerPhone: string | null
+  collectionCode: string | null
 }
 
 /** Real margin math for one cart line — null when the product has no admin-set retail
@@ -40,7 +88,66 @@ function computeLineMargin(item: { product: { casePrice: number; unitsPerPack: n
   return { totalUnits, wholesaleCost, retailValue, profit, marginPct }
 }
 
-export function CartFooter() {
+/** Shown once an order exists: confirms it and, if there's a balance, says how to pay it. */
+function OrderPlacedPanel({ order, onDone }: { order: PlacedOrder; onDone: () => void }) {
+  const isCollect = order.fulfillmentMethod === "click_and_collect"
+  const isPaid = order.paymentStatus === "paid"
+  const method = payableMethod(order)
+
+  const textTo = order.customerPhone ? ` on ${order.customerPhone}` : ""
+  let message: string
+  if (isCollect) {
+    message = `Your order is in. We'll text you${textTo} the moment it's ready to collect.`
+  } else if (isPaid) {
+    message = "Your order has been confirmed. Estimated dispatch under 24 hours."
+  } else {
+    message = "Your order is in. Pay by bank transfer and we'll dispatch within 24 hours of receiving it."
+  }
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="flex flex-col items-center text-center">
+          <div className="w-16 h-16 bg-blue-600 flex items-center justify-center mb-4 rounded-full shadow-lg shadow-blue-600/30">
+            <CheckCircle className="w-8 h-8 text-white" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800 uppercase tracking-wider">Order Placed</h3>
+          <p className="mt-1 font-mono text-[11px] font-semibold text-slate-400">#{order.orderNumber}</p>
+          <p className="text-sm text-slate-600 mt-2">{message}</p>
+        </div>
+
+        {!isPaid && method === "bank_transfer" && order.paymentReference && (
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <PaymentInstructions amount={order.total} reference={order.paymentReference} />
+          </div>
+        )}
+
+        {isCollect && order.collectionCode && (
+          <div className="mt-5">
+            <CollectionPass code={order.collectionCode} amountDue={isPaid ? 0 : order.total} />
+          </div>
+        )}
+
+        {(!isPaid || isCollect) && (
+          <p className="mt-3 text-center text-[11px] text-slate-500">
+            {method === "counter" ? "Your collection pass is also under Orders." : "You can find these details again under Orders."}
+          </p>
+        )}
+      </div>
+      <div className="border-t border-slate-200 bg-white px-4 py-3">
+        <button
+          type="button"
+          onClick={onDone}
+          className="w-full py-3 bg-blue-600 text-white font-bold text-sm uppercase tracking-wider hover:bg-blue-700 transition-colors rounded"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function CartFooter({ showBar = true }: { showBar?: boolean }) {
   const {
     items,
     totalItems,
@@ -56,11 +163,14 @@ export function CartFooter() {
   } = useCart()
   const { data: session } = useSession()
   const cartPulsing = usePulseOnCartAdded()
+  // While picks are staged, the shop's "Add N items" bar owns the bottom slot.
+  const { totalItems: stagedItems, justAdded: stagingJustAdded } = useShopStaging()
   const [showCheckoutForm, setShowCheckoutForm] = useState(false)
-  const [orderPlaced, setOrderPlaced] = useState(false)
+  const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<CheckoutFormData>(initialForm)
   const [formError, setFormError] = useState("")
+  const [savedDetails, setSavedDetails] = useState<SavedCheckoutDetails | null>(null)
 
   // Back button: closes the cart/checkout sheet instead of leaving the app (no history
   // entry otherwise). Deliberately ONE combined boolean, not two nested ones keyed off
@@ -68,7 +178,17 @@ export function CartFooter() {
   // checkout form flips a "isCartOpen && !showCheckoutForm" condition to false as a
   // side effect, which the hook can't tell apart from an actual close, so it fired a
   // spurious history.back() that closed the form the instant it opened.
-  useBackHandler(isCartOpen, closeCart)
+  //
+  // Closing after an order was placed also resets the sheet, so the confirmation
+  // doesn't reappear the next time the cart is opened.
+  const handleCloseSheet = () => {
+    closeCart()
+    if (placedOrder) {
+      setPlacedOrder(null)
+      setShowCheckoutForm(false)
+    }
+  }
+  useBackHandler(isCartOpen, handleCloseSheet)
 
   // Wallet and Promo states
   const [walletBalance, setWalletBalance] = useState(0)
@@ -77,13 +197,18 @@ export function CartFooter() {
   const [appliedPromo, setAppliedPromo] = useState<any>(null)
   const [promoError, setPromoError] = useState("")
 
-  // Fetch wallet balance when cart opens
+  // Fetch wallet balance and any remembered checkout details when the cart opens, so the
+  // checkout form is already filled in by the time "Place Order" is tapped.
   useEffect(() => {
     if (isCartOpen && session) {
       fetch("/api/wallet")
         .then((res) => res.json())
         .then((data) => setWalletBalance(data.balance))
         .catch((err) => console.error("Error loading wallet balance for cart:", err))
+      fetch("/api/account/checkout-details")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setSavedDetails(data))
+        .catch(() => setSavedDetails(null))
     }
   }, [isCartOpen, session])
 
@@ -172,6 +297,8 @@ export function CartFooter() {
   // it should only appear once the retailer has actually added a real product. The gift
   // still shows normally inside the full cart drawer once opened.
   const hasRealItems = items.some((i) => !i.product.isGiftItem)
+  const barVisible = hasRealItems && showBar && stagedItems === 0 && !stagingJustAdded
+  useFloatingBarPresence(barVisible)
 
   if (totalItems === 0 && !isCartOpen) return null
 
@@ -180,6 +307,7 @@ export function CartFooter() {
       alert("Please sign in to place an order.")
       return
     }
+    setFormData(prefilledForm(savedDetails))
     setShowCheckoutForm(true)
   }
 
@@ -188,7 +316,7 @@ export function CartFooter() {
     if (isSubmitting) return
     setFormError("")
 
-    const { fulfillmentMethod, customerPhone, shippingAddress, notes } = formData
+    const { fulfillmentMethod, paymentMethod, customerPhone, shippingAddress, notes } = formData
     const isDelivery = fulfillmentMethod === "delivery"
     if (!customerPhone.trim() || (isDelivery && !shippingAddress.trim())) {
       setFormError(isDelivery ? "Please fill in shipping address and phone." : "Please fill in your phone number.")
@@ -208,6 +336,8 @@ export function CartFooter() {
         notes: notes.trim() || undefined,
         promoCode: appliedPromo ? appliedPromo.code : undefined,
         useWalletCredits,
+        paymentMethod,
+        saveDetails: formData.rememberDetails,
       }
 
       const response = await fetch("/api/orders", {
@@ -221,39 +351,15 @@ export function CartFooter() {
         throw new Error(err.error || "Failed to place order")
       }
 
-      const order = await response.json()
-
-      // Wallet credits fully covered the order — nothing left to pay, show confirmation.
-      if (order.paymentStatus === "paid") {
-        setOrderPlaced(true)
-        setTimeout(() => {
-          clearCart()
-          closeCart()
-          setShowCheckoutForm(false)
-          setOrderPlaced(false)
-          setFormData(initialForm)
-          setAppliedPromo(null)
-          setUseWalletCredits(false)
-        }, 2500)
-        return
-      }
-
-      // Otherwise there's a balance to pay by card — hand off to Shopify's checkout
-      // (Viva is enabled as a payment method there). Cart is cleared now since the order
-      // already exists server-side; if payment is abandoned the order stays in "Orders"
-      // with a Pay Now button to retry.
+      // The order exists server-side from here, so the cart is finished with whether or
+      // not it's paid yet. The confirmation shows how to pay (bank details, or cash at the
+      // counter); the same details stay on the order under "Orders".
+      setPlacedOrder(await response.json())
       clearCart()
-      const paymentRes = await fetch("/api/payments/shopify/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: order.id }),
-      })
-      const paymentData = await paymentRes.json()
-      if (!paymentRes.ok) throw new Error(paymentData.error || "Failed to start payment")
-      window.location.href = paymentData.checkoutUrl
+      setAppliedPromo(null)
+      setUseWalletCredits(false)
     } catch (error) {
       console.error("Error placing order:", error)
-      setOrderPlaced(false)
       setFormError(error instanceof Error ? error.message : "Failed to place order. Please try again.")
     } finally {
       setIsSubmitting(false)
@@ -270,7 +376,7 @@ export function CartFooter() {
       {/* Sticky Footer Bar — only once a real (non-gift) product is in the cart.
           Same rounded-pill shape/font treatment as the "Add N items" staging bar
           (flavour-quick-add-list.tsx) so both floating cart CTAs read as one family. */}
-      {hasRealItems && (
+      {barVisible && (
         <div className="pointer-events-none fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 flex justify-center px-3">
           <button
             type="button"
@@ -294,13 +400,15 @@ export function CartFooter() {
               <h2 className="text-sm font-bold uppercase tracking-wider">
                 Your Order
               </h2>
-              <p className="text-[10px] text-blue-100 font-mono uppercase">
-                {totalItems} {totalItems === 1 ? "case" : "cases"} total
-              </p>
+              {!placedOrder && (
+                <p className="text-[10px] text-blue-100 font-mono uppercase">
+                  {totalItems} {totalItems === 1 ? "case" : "cases"} total
+                </p>
+              )}
             </div>
             <button
               type="button"
-              onClick={closeCart}
+              onClick={handleCloseSheet}
               className="w-8 h-8 flex items-center justify-center text-blue-100 hover:text-white"
               aria-label="Close order"
             >
@@ -308,25 +416,8 @@ export function CartFooter() {
             </button>
           </div>
 
-          {orderPlaced ? (
-            <div className="flex-1 flex flex-col items-center justify-center px-4">
-              <div className="w-16 h-16 bg-blue-600 flex items-center justify-center mb-4 rounded-full shadow-lg shadow-blue-600/30">
-                <CheckCircle className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800 uppercase tracking-wider">
-                Order Placed
-              </h3>
-              <p className="text-sm text-slate-600 mt-2 text-center">
-                {formData.fulfillmentMethod === "click_and_collect"
-                  ? "Your order has been confirmed. We'll text you once it's ready to collect."
-                  : "Your order has been confirmed. Estimated dispatch under 24 hours."}
-              </p>
-              <div className="mt-6 flex items-center gap-2">
-                <span className="w-6 h-px bg-gradient-to-r from-transparent via-blue-400/50 to-transparent" />
-                <span className="w-2 h-2 rounded-full bg-blue-500/40" />
-                <span className="w-6 h-px bg-gradient-to-r from-transparent via-blue-400/50 to-transparent" />
-              </div>
-            </div>
+          {placedOrder ? (
+            <OrderPlacedPanel order={placedOrder} onDone={handleCloseSheet} />
           ) : showCheckoutForm ? (
             /* Checkout Form */
             <form onSubmit={handleCheckoutSubmit} className="flex-1 flex flex-col overflow-hidden">
@@ -353,7 +444,7 @@ export function CartFooter() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setFormData((p) => ({ ...p, fulfillmentMethod: "delivery" }))}
+                      onClick={() => setFormData((p) => ({ ...p, fulfillmentMethod: "delivery", paymentMethod: "bank_transfer" }))}
                       className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-xs font-bold uppercase tracking-wide transition-colors ${
                         formData.fulfillmentMethod === "delivery"
                           ? "border-blue-600 bg-blue-50 text-blue-700"
@@ -364,7 +455,13 @@ export function CartFooter() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormData((p) => ({ ...p, fulfillmentMethod: "click_and_collect" }))}
+                      onClick={() =>
+                        setFormData((p) => ({
+                          ...p,
+                          fulfillmentMethod: "click_and_collect",
+                          paymentMethod: isPaymentMethodAllowed(p.paymentMethod, "click_and_collect") ? p.paymentMethod : "cash",
+                        }))
+                      }
                       className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-xs font-bold uppercase tracking-wide transition-colors ${
                         formData.fulfillmentMethod === "click_and_collect"
                           ? "border-blue-600 bg-blue-50 text-blue-700"
@@ -415,7 +512,7 @@ export function CartFooter() {
                       {UNITY_BUSINESS.addressLines.join(", ")}
                     </p>
                     <p className="mt-1.5 text-xs text-slate-500">
-                      We'll text you on the number below once your order is ready to collect.
+                      We'll text the number above the moment your order is ready to collect.
                     </p>
                   </div>
                 )}
@@ -431,6 +528,72 @@ export function CartFooter() {
                     placeholder="Delivery instructions, etc."
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+                    How do you want to pay?
+                  </label>
+                  {finalTotal <= 0 ? (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 text-sm font-semibold text-slate-800">
+                      Covered by your wallet credits — nothing to pay.
+                    </div>
+                  ) : (
+                    <>
+                      {formData.fulfillmentMethod === "click_and_collect" && (
+                        <div className="mb-2 grid grid-cols-2 gap-2">
+                          {([
+                            { method: "cash", label: "Cash", Icon: Banknote },
+                            { method: "card", label: "Card", Icon: CreditCard },
+                          ] as const).map(({ method, label, Icon }) => (
+                            <button
+                              key={method}
+                              type="button"
+                              onClick={() => setFormData((p) => ({ ...p, paymentMethod: method }))}
+                              aria-pressed={formData.paymentMethod === method}
+                              className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-xs font-bold uppercase tracking-wide transition-colors ${
+                                formData.paymentMethod === method
+                                  ? "border-blue-600 bg-blue-50 text-blue-700"
+                                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                              }`}
+                            >
+                              <Icon className="h-4 w-4" /> {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5">
+                        <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-blue-700">
+                          {formData.paymentMethod === "cash" ? (
+                            <><Banknote className="h-3.5 w-3.5" /> Cash at the counter</>
+                          ) : formData.paymentMethod === "card" ? (
+                            <><CreditCard className="h-3.5 w-3.5" /> Card at the counter</>
+                          ) : (
+                            <><Landmark className="h-3.5 w-3.5" /> Bank transfer</>
+                          )}
+                          <span className="ml-auto font-mono text-sm text-slate-800">£{finalTotal.toFixed(2)}</span>
+                        </p>
+                        <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                          {formData.paymentMethod === "bank_transfer"
+                            ? "You'll get our bank details and a payment reference as soon as you confirm."
+                            : "Pay when you collect from the depot — nothing to pay now."}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.rememberDetails}
+                    onChange={(e) => setFormData((p) => ({ ...p, rememberDetails: e.target.checked }))}
+                    className="h-5 w-5 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-800">Remember these details</span>
+                    <span className="block text-[11px] leading-snug text-slate-500">
+                      Your phone, address and choices are filled in next time.
+                    </span>
+                  </span>
+                </label>
                 {formError && (
                   <p className="text-sm text-red-600 font-medium">{formError}</p>
                 )}
@@ -438,10 +601,10 @@ export function CartFooter() {
               <div className="border-t border-slate-200 bg-white px-4 py-3">
                 <button
                   type="submit"
-                  disabled={orderPlaced || isSubmitting}
+                  disabled={isSubmitting}
                   className="w-full py-3 bg-blue-600 text-white font-bold text-sm uppercase tracking-wider hover:bg-blue-700 transition-colors rounded disabled:opacity-50"
                 >
-                  {orderPlaced ? "Placing..." : isSubmitting ? "Confirming..." : "Confirm Order"}
+                  {isSubmitting ? "Confirming..." : "Confirm Order"}
                 </button>
               </div>
             </form>

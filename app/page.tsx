@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useLayoutEffect, useRef, type ReactNode } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { AppBottomNav, type AppTab } from "@/components/app-bottom-nav"
@@ -23,6 +23,10 @@ import { AdminReportsView } from "@/components/admin-reports-view"
 import { AdminSettingsView } from "@/components/admin-settings-view"
 import { WelcomeBuild } from "@/components/welcome-build/welcome-build"
 import { UnityAssistWidget } from "@/components/unity-assist-widget"
+import { CartFooter } from "@/components/cart-footer"
+import { AppSplash } from "@/components/app-splash"
+import { ShopStagingProvider, StagedBar } from "@/lib/shop-staging"
+import { announceTabShown } from "@/lib/tab-events"
 
 type OnboardingProfile = {
   name: string | null
@@ -81,10 +85,35 @@ function AdminView() {
   )
 }
 
+const TAB_ORDER: AppTab[] = ["shop", "orders", "offers", "assist", "account", "admin"]
+
 function AppShell() {
   const { isAdmin } = useTrade()
   const [activeTab, setActiveTabState] = useState<AppTab>("shop")
   const [productRefreshKey, setProductRefreshKey] = useState(0)
+
+  // Tabs are mounted on first visit and then kept (hidden) — switching back to Shop finds
+  // the same open brand and line, scrolled to the same spot, instead of a reset screen.
+  const [visited, setVisited] = useState<Set<AppTab>>(() => new Set<AppTab>(["shop"]))
+  const scrollByTab = useRef<Partial<Record<AppTab, number>>>({})
+  const activeTabRef = useRef<AppTab>("shop")
+
+  const showTab = (tab: AppTab) => {
+    scrollByTab.current[activeTabRef.current] = window.scrollY
+    activeTabRef.current = tab
+    setVisited((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)))
+    setActiveTabState(tab)
+  }
+
+  // Restore the tab's own scroll position before paint, so there's no flash of the
+  // previous tab's position.
+  useLayoutEffect(() => {
+    window.scrollTo(0, scrollByTab.current[activeTab] ?? 0)
+  }, [activeTab])
+
+  useEffect(() => {
+    announceTabShown(activeTab)
+  }, [activeTab])
 
   // The app is one URL with all "tabs" swapped via local state, so switching tabs never
   // left anything in browser history — the phone/browser back button had nothing of the
@@ -93,38 +122,65 @@ function AppShell() {
   useEffect(() => {
     window.history.replaceState({ tab: "shop" }, "", "#shop")
     const onPopState = (e: PopStateEvent) => {
+      // Entries pushed by sheets/modals (useBackHandler) carry no tab — those are theirs.
+      if (e.state?.backHandler) return
       const tab = (e.state?.tab as AppTab) || "shop"
-      setActiveTabState(tab)
+      showTab(tab)
     }
     window.addEventListener("popstate", onPopState)
     return () => window.removeEventListener("popstate", onPopState)
   }, [])
 
   const setActiveTab = (tab: AppTab) => {
-    if (tab !== activeTab) {
-      window.history.pushState({ tab }, "", `#${tab}`)
+    if (tab === activeTab) {
+      // Tapping the tab you're already on scrolls it back to the top, like native apps.
+      window.scrollTo({ top: 0, behavior: "smooth" })
+      return
     }
-    setActiveTabState(tab)
+    window.history.pushState({ tab }, "", `#${tab}`)
+    showTab(tab)
+  }
+
+  const renderTab = (tab: AppTab): ReactNode => {
+    switch (tab) {
+      case "shop":
+        return (
+          <ShopView
+            isAdmin={isAdmin}
+            productRefreshKey={productRefreshKey}
+            onProductAdded={() => setProductRefreshKey((k) => k + 1)}
+          />
+        )
+      case "orders":
+        return isAdmin ? <AdminOrdersView /> : <OrdersView />
+      case "offers":
+        return <OffersView />
+      case "assist":
+        return isAdmin ? <AdminCreditControlView /> : <RetailAssistView />
+      case "account":
+        return <AccountView />
+      case "admin":
+        return isAdmin ? <AdminView /> : null
+    }
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col md:max-w-4xl md:mx-auto md:bg-slate-100">
-      {activeTab === "shop" && (
-        <ShopView
-          isAdmin={isAdmin}
-          productRefreshKey={productRefreshKey}
-          onProductAdded={() => setProductRefreshKey((k) => k + 1)}
-        />
-      )}
-      {activeTab === "orders" && (isAdmin ? <AdminOrdersView /> : <OrdersView />)}
-      {activeTab === "offers" && <OffersView />}
-      {activeTab === "assist" && (isAdmin ? <AdminCreditControlView /> : <RetailAssistView />)}
-      {activeTab === "account" && <AccountView />}
-      {activeTab === "admin" && isAdmin && <AdminView />}
+    <ShopStagingProvider>
+      <div className="min-h-[100dvh] flex flex-col md:max-w-4xl md:mx-auto md:bg-slate-100">
+        {TAB_ORDER.filter((tab) => visited.has(tab)).map((tab) => (
+          <div key={tab} hidden={tab !== activeTab}>
+            {renderTab(tab)}
+          </div>
+        ))}
 
-      <AppBottomNav activeTab={activeTab} onTabChange={setActiveTab} isAdmin={isAdmin} />
-      <UnityAssistWidget />
-    </div>
+        {/* The cart sheet can open from any tab (e.g. Quick Reorder on Orders); its
+            floating "View Order" bar only shows on Shop. */}
+        <StagedBar active={activeTab === "shop"} />
+        <CartFooter showBar={activeTab === "shop"} />
+        <AppBottomNav activeTab={activeTab} onTabChange={setActiveTab} isAdmin={isAdmin} />
+        <UnityAssistWidget />
+      </div>
+    </ShopStagingProvider>
   )
 }
 
@@ -151,24 +207,8 @@ function HomeContent() {
     }
   }, [status, router])
 
-  if (status === "loading" || (status === "authenticated" && profileLoading)) {
-    return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-slate-100">
-        <div className="animate-pulse text-slate-500 font-mono text-sm uppercase tracking-wider">
-          Loading...
-        </div>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-slate-100">
-        <div className="animate-pulse text-slate-500 font-mono text-sm uppercase tracking-wider">
-          Loading...
-        </div>
-      </div>
-    )
+  if (status === "loading" || (status === "authenticated" && profileLoading) || !session) {
+    return <AppSplash />
   }
 
   const role = (session.user as { role?: string })?.role

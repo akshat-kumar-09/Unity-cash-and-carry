@@ -35,6 +35,11 @@ model User {
   assignedRepId          String?
   /// Saved cart (array of {productId, quantity}) — survives logout/login and device changes.
   cartData               Json?
+  /// Checkout details the retailer asked to remember ("Remember these details" at checkout).
+  savedPhone             String?
+  savedAddress           String?
+  savedFulfillment       String?   // "delivery" | "click_and_collect"
+  savedPaymentMethod     String?   // "bank_transfer" | "cash" | "card"
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   orders        Order[]
@@ -122,12 +127,24 @@ model Order {
   // VPD duty tracking
   vapeDutyAmount     Float @default(0.00)
   vatOnDuty          Float @default(0.00)
-  // Viva Wallet (Smart Checkout) payment tracking
-  paymentStatus      String    @default("unpaid") // unpaid, paid, failed
-  paymentMethod      String?   // "card" (Viva via Shopify checkout) | "wallet" (fully covered by wallet credits)
+  // Click & collect handover. The collection code is what the retailer's collection
+  // pass (QR) carries and what staff look the order up by at the counter.
+  collectionCode     String?   @unique
+  readyAt            DateTime?
+  /// What happened when the retailer was told it's ready, e.g. "Texted +447700900123".
+  readyNotice        String?
+  collectedAt        DateTime?
+  // Payment tracking
+  paymentStatus      String    @default("unpaid") // unpaid, paid
+  paymentMethod      String?   // "bank_transfer" (delivery) | "cash" / "card" (paid at the counter, click & collect) | "wallet" (fully covered by wallet credits). Older orders may hold "card" from online card payment.
+  /// Short code the retailer quotes on their bank transfer so it can be matched to this
+  /// order (UK payment references allow 18 characters; order numbers are longer).
+  paymentReference   String?   @unique
+  paidAt             DateTime?
+  // Records of card payments taken before online card payment was withdrawn — kept so
+  // those payments can still be traced; nothing writes to these any more.
   vivaOrderCode      String?   @unique
   shopifyDraftOrderId String?  @unique
-  paidAt             DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   items         OrderItem[]

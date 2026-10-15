@@ -1,16 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { ChevronDown, ChevronUp } from "lucide-react"
-import type { Product } from "@/lib/products"
+import { useMemo, useState } from "react"
+import { ChevronDown } from "lucide-react"
 import { PRODUCT_LINES_BY_BRAND, type ProductCategorySlug } from "@/lib/product-categories"
 import { FlavourQuickAddList } from "@/components/flavour-quick-add-list"
 import { BrandMark } from "@/components/brand-mark"
-
-/** Matches the higher fetch cap used elsewhere when a screen needs "everything for
- *  this brand" rather than a paginated page — a brand's SKU count within one category
- *  is small (a handful of lines × a handful of flavours), well under the API's 100 cap. */
-const LINE_FETCH_LIMIT = 100
+import { Expand } from "@/components/expand"
+import { useProducts } from "@/lib/product-store"
+import { anchorScroll } from "@/lib/anchor-scroll"
 
 type BrandLineRowsProps = {
   categorySlug: ProductCategorySlug
@@ -20,44 +17,17 @@ type BrandLineRowsProps = {
   onProductUpdated?: () => void
 }
 
-/** Nested inside an expanded brand row (Vaping/E-liquids): fetches that brand's real
- *  product lines and renders them as its own single-open accordion — tapping a line
- *  expands straight into its flavour quick-add rows, no screen navigation involved. */
+/** Nested inside an expanded brand row (Vaping/E-liquids): the brand's real product
+ *  lines as a single-open accordion — tapping a line expands straight into its flavour
+ *  quick-add rows. Lines and flavours come from one cached request for the brand, so
+ *  opening, closing and reopening lines is instant. */
 export function BrandLinePicker({ categorySlug, brand, search, isAdmin = false, onProductUpdated }: BrandLineRowsProps) {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const { products, failed, retry } = useProducts({ category: categorySlug, brand })
   const [openLine, setOpenLine] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        params.set("category", categorySlug)
-        params.set("brand", brand)
-        params.set("limit", String(LINE_FETCH_LIMIT))
-        const res = await fetch(`/api/products?${params.toString()}`)
-        const data = await res.json()
-        if (cancelled) return
-        setProducts(Array.isArray(data?.products) ? data.products : [])
-      } catch {
-        if (!cancelled) setProducts([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [categorySlug, brand])
-
-  useEffect(() => {
-    setOpenLine(null)
-  }, [categorySlug, brand])
 
   const lines = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const p of products) {
+    for (const p of products ?? []) {
       if (!p.productLine) continue
       counts.set(p.productLine, (counts.get(p.productLine) ?? 0) + 1)
     }
@@ -67,13 +37,27 @@ export function BrandLinePicker({ categorySlug, brand, search, isAdmin = false, 
     return [...ordered, ...extra].map((line) => ({ line, count: counts.get(line) ?? 0 }))
   }, [products, brand])
 
-  if (loading) {
+  if (products === null && !failed) {
+    return (
+      <div className="border-t border-dashed border-blue-100/90 px-1.5 pb-1.5 pt-1" aria-busy="true" aria-label={`Loading ${brand} lines`}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="mt-1.5 flex items-center gap-2.5 rounded-xl border border-dashed border-blue-200/70 bg-white/70 px-3.5 py-3.5 first:mt-0">
+            <div className="h-6 w-10 rounded-md bg-slate-100" />
+            <div className="h-3 flex-1 rounded bg-slate-100" />
+            <div className="h-5 w-16 rounded-full bg-slate-100" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (failed) {
     return (
       <div className="border-t border-dashed border-blue-100/90 px-3 py-3 text-center">
-        <div className="inline-flex items-center gap-2">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-200 border-t-blue-500" />
-          <p className="text-[11px] font-bold uppercase tracking-wider text-blue-500/80">Loading lines…</p>
-        </div>
+        <p className="text-[11px] font-semibold text-slate-500">Couldn&apos;t load {brand} right now.</p>
+        <button type="button" onClick={retry} className="mt-1 text-[11px] font-bold uppercase tracking-wider text-blue-700">
+          Try again
+        </button>
       </div>
     )
   }
@@ -96,7 +80,7 @@ export function BrandLinePicker({ categorySlug, brand, search, isAdmin = false, 
           <div key={line} className="mt-1.5 overflow-hidden rounded-xl border border-dashed border-blue-300/80 bg-gradient-to-br from-white via-blue-50/35 to-white shop-vape-stripes shadow-inner first:mt-0">
             <button
               type="button"
-              onClick={() => setOpenLine(isOpen ? null : line)}
+              onClick={(e) => anchorScroll(e.currentTarget, () => setOpenLine(isOpen ? null : line))}
               className="unity-tap flex w-full items-center justify-between gap-2 px-3.5 py-3.5 text-left"
               aria-expanded={isOpen}
             >
@@ -110,24 +94,24 @@ export function BrandLinePicker({ categorySlug, brand, search, isAdmin = false, 
                 <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-500">
                   {count} {count === 1 ? "flavour" : "flavours"}
                 </span>
-                {isOpen ? (
-                  <ChevronUp className="h-4 w-4 shrink-0 text-blue-500" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 shrink-0 text-blue-500" />
-                )}
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-blue-500 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+                />
               </span>
             </button>
             {isOpen && (
-              <div className="border-t border-dashed border-blue-100/90 p-1.5">
-                <FlavourQuickAddList
-                  categorySlug={categorySlug}
-                  brand={brand}
-                  productLine={line}
-                  search={search}
-                  isAdmin={isAdmin}
-                  onProductUpdated={onProductUpdated}
-                />
-              </div>
+              <Expand>
+                <div className="border-t border-dashed border-blue-100/90 p-1.5">
+                  <FlavourQuickAddList
+                    categorySlug={categorySlug}
+                    brand={brand}
+                    productLine={line}
+                    search={search}
+                    isAdmin={isAdmin}
+                    onProductUpdated={onProductUpdated}
+                  />
+                </div>
+              </Expand>
             )}
           </div>
         )

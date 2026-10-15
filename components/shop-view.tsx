@@ -4,10 +4,10 @@ import { useState } from "react"
 import { Search, Filter, ChevronLeft, ShoppingCart } from "lucide-react"
 import { UnityLogo } from "@/components/unity-logo"
 import { useCart } from "@/lib/cart-context"
-import { CartFooter } from "@/components/cart-footer"
 import { ShopCategoryAccordion } from "@/components/shop-category-accordion"
 import { AdminBanner } from "@/components/admin-banner"
 import { ProductCatalog } from "@/components/product-catalog"
+import { ShopInsights } from "@/components/shop-insights"
 import { type ProductCategorySlug } from "@/lib/product-categories"
 import { useBackHandler } from "@/lib/use-back-handler"
 import { usePulseOnCartAdded } from "@/lib/cart-feedback"
@@ -80,20 +80,21 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
         </div>
       </header>
 
-      <main
-        className={`flex-1 min-h-0 overflow-y-auto shop-main-tint ${
-          showProductGrid ? "pb-36" : "pb-28"
-        }`}
-      >
+      {/* Extra bottom room so the last rows clear the floating bars and bottom nav. */}
+      <main className="flex-1 min-h-0 overflow-y-auto shop-main-tint pb-44">
         {isAdmin && <AdminBanner onProductAdded={onProductAdded} morphed={false} />}
 
         {!showProductGrid ? (
+          <>
+          {/* Restock + local trends — hidden while searching, and for admin (no buying of their own) */}
+          {!isAdmin && !search.trim() && <ShopInsights />}
           <ShopCategoryAccordion
             search={search}
             onNavigate={({ categorySlug }) => setSelectedCategorySlug(categorySlug)}
             isAdmin={isAdmin}
             onProductUpdated={onProductAdded}
           />
+          </>
         ) : (
           <>
             {/* Fixed above bottom tab bar — always reachable while scrolling products */}
@@ -126,7 +127,6 @@ export function ShopView({ isAdmin, productRefreshKey, onProductAdded }: ShopVie
         )}
       </main>
 
-      <CartFooter />
     </div>
   )
 }

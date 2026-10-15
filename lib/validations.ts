@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { COUNTER_PAYMENT_METHODS, PAYMENT_METHODS, PAYMENT_STATUSES, isPaymentMethodAllowed } from '@/lib/payment'
 import { PRODUCT_CATEGORY_SLUGS, type ProductCategorySlug } from '@/lib/product-categories'
 
 export const changePasswordSchema = z.object({
@@ -73,15 +74,35 @@ export const createOrderSchema = z
     notes: z.string().optional(),
     promoCode: z.string().optional(),
     useWalletCredits: z.boolean().optional(),
+    /** Delivery is paid by bank transfer; click & collect by cash or card at the counter.
+     *  Omitted → the default for the fulfilment method. */
+    paymentMethod: z.enum(PAYMENT_METHODS).optional(),
+    /** Remember phone/address/choices for next checkout (false forgets them). */
+    saveDetails: z.boolean().optional(),
   })
   .refine((d) => d.fulfillmentMethod === "click_and_collect" || !!d.shippingAddress?.trim(), {
     message: "Shipping address is required for delivery orders",
     path: ["shippingAddress"],
   })
+  .refine((d) => !d.paymentMethod || isPaymentMethodAllowed(d.paymentMethod, d.fulfillmentMethod), {
+    message: "Delivery orders are paid by bank transfer; click & collect by cash or card at the counter",
+    path: ["paymentMethod"],
+  })
 
-export const updateOrderStatusSchema = z.object({
-  status: z.enum(["pending", "confirmed", "dispatched", "delivered", "cancelled"]),
+/** Staff handing over a click & collect order — how the balance was paid, if one was due. */
+export const collectOrderSchema = z.object({
+  paymentMethod: z.enum(COUNTER_PAYMENT_METHODS).optional(),
 })
+
+/** Admin order update — dispatch status, payment status, or both. */
+export const updateOrderStatusSchema = z
+  .object({
+    status: z.enum(["pending", "confirmed", "dispatched", "delivered", "cancelled"]).optional(),
+    paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
+  })
+  .refine((d) => d.status !== undefined || d.paymentStatus !== undefined, {
+    message: "Nothing to update",
+  })
 
 export const createGuestOrderSchema = z
   .object({

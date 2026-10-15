@@ -78,18 +78,10 @@ export function AdminDashboardView({ activeSection, onSectionChange, children }:
         const data = await res.json()
         setStats(data)
       } catch (e) {
+        // Never show stand-in figures here — an owner reading made-up revenue as real is
+        // worse than an honest "couldn't load".
         setError(e instanceof Error ? e.message : "Something went wrong")
-        // Fallback demo data for presentation
-        setStats({
-          ordersToday: 23,
-          ordersThisMonth: 347,
-          revenueThisMonth: 84250.0,
-          dutyThisMonth: 12680.5,
-          activeTraders: 89,
-          pendingCompliance: 7,
-          revenueTrend: 12.4,
-          ordersTrend: 8.2,
-        })
+        setStats(null)
       } finally {
         setLoading(false)
       }
@@ -219,9 +211,14 @@ export function AdminDashboardView({ activeSection, onSectionChange, children }:
             {error && (
               <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-[12px] font-medium text-amber-800 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>
-                  Live API unavailable — showing cached data. {error}
-                </span>
+                <span className="flex-1">Couldn&apos;t load today&apos;s figures. Pull to refresh or try again shortly.</span>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-900"
+                >
+                  Retry
+                </button>
               </div>
             )}
 
